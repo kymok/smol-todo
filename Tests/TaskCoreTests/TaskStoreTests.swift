@@ -868,7 +868,7 @@ final class TaskStoreTests: XCTestCase {
 
         let json = try XCTUnwrap(String(data: Data(contentsOf: store.fileURL), encoding: .utf8))
         XCTAssertTrue(json.contains(#""collectionPrompts""#))
-        XCTAssertTrue(json.contains(#""DefaultCollection" : "Run {{cliCommand}} for {{collectionName}}.""#))
+        XCTAssertTrue(json.contains(#""Inbox" : "Run {{cliCommand}} for {{collectionName}}.""#))
     }
 
     func testBlankCollectionPromptRemovesOverride() throws {

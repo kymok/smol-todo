@@ -4,7 +4,7 @@ import Foundation
 /// Thread- and process-safe via an exclusive file lock (see ``withFile(write:)``).
 /// All stored state is immutable (`let`), so the type is genuinely `Sendable`.
 public final class TaskStore: Sendable {
-    public static let defaultCollection = "DefaultCollection"
+    public static let defaultCollection = "Inbox"
     public static let defaultCollectionGroup = "DefaultGroup"
 
     public let fileURL: URL

@@ -177,15 +177,18 @@ func collectionReferenceIfValid(_ collection: String) -> CollectionReference? {
 
 func collectionAPIName(groupName: String, displayName: String) -> String {
     if groupName == TaskStore.defaultCollectionGroup {
-        return displayName == legacyDefaultCollection ? TaskStore.defaultCollection : displayName
+        if displayName == legacyDefaultCollection || displayName == legacyDefaultCollectionName {
+            return TaskStore.defaultCollection
+        }
+        return displayName
     }
 
     return "\(groupName)/\(displayName)"
 }
 
 func collectionDisplayName(_ collection: String) -> String {
-    if collection == TaskStore.defaultCollection {
-        return legacyDefaultCollection
+    if collection == TaskStore.defaultCollection || collection == legacyDefaultCollectionName {
+        return "Inbox"
     }
 
     return collectionReferenceIfValid(collection)?.displayName ?? collection
@@ -228,6 +231,7 @@ func normalizedStoredCollectionGroup(_ group: String) throws -> String {
 
 let legacyDefaultCollectionGroup = "Collections"
 let legacyDefaultCollection = "Inbox"
+let legacyDefaultCollectionName = "DefaultCollection"
 
 func normalizedCollectionGroups(
     _ groups: [TaskCollectionGroup]?,

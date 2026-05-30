@@ -84,7 +84,9 @@ final class TaskAppModel {
     }
 
     var title: String {
-        selectedCollectionName ?? "All"
+        selectedCollectionSummary?.displayName ?? selectedCollectionName.map { name in
+            name.split(separator: "/", maxSplits: 1).last.map(String.init) ?? name
+        } ?? "All"
     }
 
     // Group shown as the window title's subtitle; empty when the collection
@@ -1047,7 +1049,10 @@ final class TaskAppModel {
 
     private func collectionAPIName(group: String, displayName: String) -> String {
         if group == TaskStore.defaultCollectionGroup {
-            return displayName == "Inbox" ? TaskStore.defaultCollection : displayName
+            if displayName == "Inbox" || displayName == "DefaultCollection" {
+                return TaskStore.defaultCollection
+            }
+            return displayName
         }
 
         return "\(group)/\(displayName)"
