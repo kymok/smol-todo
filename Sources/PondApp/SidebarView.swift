@@ -103,16 +103,16 @@ struct SidebarView: View {
 
             HStack(spacing: 8) {
                 Menu {
+                    Button("Add a Group") {
+                        createCollectionGroup()
+                    }
+
                     Menu("Add a Collection To") {
                         ForEach(model.collectionGroupSummaries) { group in
                             Button(model.collectionGroupDisplayName(group.name)) {
                                 createCollection(group: group.name)
                             }
                         }
-                    }
-
-                    Button("Add a Group") {
-                        createCollectionGroup()
                     }
 
                     Divider()
