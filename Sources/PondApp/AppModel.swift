@@ -87,6 +87,17 @@ final class TaskAppModel {
         selectedCollectionName ?? "All"
     }
 
+    // Group shown as the window title's subtitle; empty when the collection
+    // has no meaningful group (the default "No Group" group).
+    var titleSubtitle: String {
+        guard let groupName = selectedCollectionSummary?.groupName,
+              groupName != TaskStore.defaultCollectionGroup else {
+            return ""
+        }
+
+        return collectionGroupDisplayName(groupName)
+    }
+
     var collectionNames: [String] {
         visibleCollectionSummaries.map(\.displayName)
     }

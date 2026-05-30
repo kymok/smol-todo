@@ -106,6 +106,7 @@ struct DetailView: View {
             }
         }
         .navigationTitle(model.title)
+        .navigationSubtitle(model.titleSubtitle)
         .toolbar {
             DetailToolbar()
         }
