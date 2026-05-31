@@ -1464,9 +1464,9 @@ struct TaskRow: View {
                 HStack(spacing: 4) {
                     collectionColorIcon(item.collection)
 
-                    Text(item.collection)
+                    Text(model.collectionDisplayName(named: item.collection))
                         .lineLimit(1)
-                        .truncationMode(.tail)
+                        .truncationMode(.middle)
 
                     Spacer(minLength: 0)
 
@@ -1477,6 +1477,7 @@ struct TaskRow: View {
                 .collectionChipStyle()
             }
             .buttonStyle(.plain)
+            .help(model.collectionHelp(named: item.collection))
             .frame(width: TaskRowLayout.collectionControlWidth)
             .disabled(!canEditTitleAndCollection)
         }

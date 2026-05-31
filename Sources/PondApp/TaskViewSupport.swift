@@ -158,7 +158,7 @@ enum SidebarLayout {
 }
 
 enum TaskRowLayout {
-    static let collectionControlWidth: CGFloat = 80
+    static let collectionControlWidth: CGFloat = 120
     static let collectionControlHorizontalPadding: CGFloat = 8
     static let collectionControlContentWidth = collectionControlWidth - (collectionControlHorizontalPadding * 2)
     static let rowVerticalPadding: CGFloat = 10

@@ -104,6 +104,13 @@ final class TaskAppModel {
         visibleCollectionSummaries.map(\.displayName)
     }
 
+    var visibleIncompleteCount: Int {
+        itemCount(
+            in: showsArchivedCollections ? collectionSummaries : visibleCollectionSummaries,
+            where: \.status.isIncomplete
+        )
+    }
+
     var visibleCollectionSummaries: [TaskCollectionSummary] {
         collectionSummaries.filter { !$0.isArchived }
     }
@@ -131,6 +138,21 @@ final class TaskAppModel {
 
     func collectionColor(named name: String) -> TaskCollectionColor {
         collectionSummaries.first { $0.name == name }?.color ?? .gray
+    }
+
+    func collectionDisplayName(named name: String) -> String {
+        collectionSummaries.first { $0.name == name }?.displayName
+            ?? name.split(separator: "/", maxSplits: 1).last.map(String.init)
+            ?? name
+    }
+
+    func collectionHelp(named name: String) -> String {
+        guard let collection = collectionSummaries.first(where: { $0.name == name }),
+              collection.groupName != TaskStore.defaultCollectionGroup else {
+            return collectionDisplayName(named: name)
+        }
+
+        return "\(collectionGroupDisplayName(collection.groupName)) / \(collection.displayName)"
     }
 
     func collectionGroupDisplayName(_ group: String) -> String {
@@ -163,6 +185,9 @@ final class TaskAppModel {
     func itemIsVisible(_ item: TaskItem, keepsRecentlyCompletedVisible: Bool = false) -> Bool {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         let collectionMatches = selectedCollectionName.map { $0 == item.collection } ?? true
+        let archivedMatches = selectedCollectionName != nil
+            || showsArchivedCollections
+            || !collectionIsArchived(item.collection)
         let statusMatches = !showsIncompleteOnly
             || item.status.isIncomplete
             || (keepsRecentlyCompletedVisible && recentlyCompletedVisibleIDs.contains(item.id))
@@ -171,11 +196,7 @@ final class TaskAppModel {
             || item.collection.localizedCaseInsensitiveContains(query)
             || item.id.localizedCaseInsensitiveContains(query)
 
-        return collectionMatches && statusMatches && searchMatches
-    }
-
-    var totalIncompleteCount: Int {
-        collectionSummaries.reduce(0) { $0 + $1.incompleteCount }
+        return collectionMatches && archivedMatches && statusMatches && searchMatches
     }
 
     func reload() {
@@ -979,6 +1000,18 @@ final class TaskAppModel {
         return "\(base) \(index)"
     }
 
+    private func collectionIsArchived(_ name: String) -> Bool {
+        collectionSummaries.first { $0.name == name }?.isArchived ?? false
+    }
+
+    private func itemCount(
+        in collections: [TaskCollectionSummary],
+        where predicate: (TaskItem) -> Bool
+    ) -> Int {
+        let collectionNames = Set(collections.map(\.name))
+        return items.filter { collectionNames.contains($0.collection) && predicate($0) }.count
+    }
+
     private func uniqueCollectionGroupName(base: String, excluding excludedName: String? = nil) -> String {
         let existing = Set(collectionGroupSummaries
             .map(\.name)
@@ -1184,4 +1217,3 @@ final class TaskAppModel {
         }
     }
 }
-

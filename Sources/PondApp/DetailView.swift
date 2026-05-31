@@ -165,6 +165,7 @@ struct DetailView: View {
                         item: item,
                         title: activeTitle(for: item) ?? item.title,
                         showsCollection: model.selectedCollectionName == nil,
+                        collectionLabel: model.collectionDisplayName(named: item.collection),
                         collectionColor: model.collectionColor(named: item.collection),
                         sourceSize: taskDragState.sourceSize(for: item.id)
                     )
@@ -1261,6 +1262,7 @@ private struct TaskDragPreview: View {
     let item: TaskItem
     let title: String
     let showsCollection: Bool
+    let collectionLabel: String
     let collectionColor: TaskCollectionColor
     let sourceSize: CGSize?
 
@@ -1378,9 +1380,9 @@ private struct TaskDragPreview: View {
         HStack(spacing: 4) {
             CollectionColorSwatch(color: collectionColor, size: 7)
 
-            Text(item.collection)
+            Text(collectionLabel)
                 .lineLimit(1)
-                .truncationMode(.tail)
+                .truncationMode(.middle)
 
             Spacer(minLength: 0)
 

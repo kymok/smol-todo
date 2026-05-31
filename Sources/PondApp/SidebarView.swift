@@ -64,7 +64,7 @@ struct SidebarView: View {
             List(selection: $sidebarSelection) {
                 Section {
                     Label("All", systemImage: "tray.full")
-                        .badge(model.totalIncompleteCount)
+                        .badge(model.visibleIncompleteCount)
                         .tag(TaskAppModel.allCollectionID)
                         .contextMenu {
                             Button("Bulk Change Statuses…") {
@@ -500,7 +500,7 @@ struct SidebarView: View {
     private func collectionIcon(for collection: TaskCollectionSummary) -> some View {
         if collection.isArchived {
             Image(systemName: "archivebox")
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(collection.color.swiftUIColor)
         } else {
             switch collection.statusIndicator {
             case .aborted, .onHold, .rejected:
