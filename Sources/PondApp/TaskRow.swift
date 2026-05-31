@@ -376,13 +376,23 @@ struct TaskRow: View {
         }
     }
 
-    @ViewBuilder
+    // The lightweight display Text always drives the row height; the NSTextView
+    // editor is overlaid only while editing. SwiftUI's Text lays out multi-line
+    // text a couple of points taller than TextKit's NSTextView (most visibly for
+    // CJK, which falls back to a different font), so a plain display<->editor swap
+    // resized the row on focus and nudged the rows below (and the focus animation
+    // made the note icon glide). Keeping the same Text in both states pins the
+    // height, and because the editor is always the shorter of the two it fits the
+    // overlay without clipping. .animation(nil) keeps the overlay swap instant.
     private var titleEditor: some View {
-        if isTitleEditing {
-            titleEditorField
-        } else {
-            titleDisplay
-        }
+        titleDisplay
+            .opacity(isTitleEditing ? 0 : 1)
+            .overlay(alignment: .topLeading) {
+                if isTitleEditing {
+                    titleEditorField
+                }
+            }
+            .animation(nil, value: isTitleEditing)
     }
 
     // Edit when this row's title is focused, or while it is the pending draft
@@ -504,13 +514,18 @@ struct TaskRow: View {
         .animation(.easeInOut(duration: 0.22), value: isNoteFocused)
     }
 
-    @ViewBuilder
+    // Display Text drives the height; the editor overlays only while editing
+    // (see titleEditor). This pins the note's height across focus, so the row no
+    // longer resizes and the note icon no longer glides on focus.
     private var noteEditor: some View {
-        if isNoteEditing {
-            noteEditorField
-        } else {
-            noteDisplay
-        }
+        noteDisplay
+            .opacity(isNoteEditing ? 0 : 1)
+            .overlay(alignment: .topLeading) {
+                if isNoteEditing {
+                    noteEditorField
+                }
+            }
+            .animation(nil, value: isNoteEditing)
     }
 
     // Edit when the note is focused or a new note body is being drafted.
