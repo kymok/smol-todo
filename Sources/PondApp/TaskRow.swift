@@ -376,7 +376,68 @@ struct TaskRow: View {
         }
     }
 
+    @ViewBuilder
     private var titleEditor: some View {
+        if isTitleEditing {
+            titleEditorField
+        } else {
+            titleDisplay
+        }
+    }
+
+    // Edit when this row's title is focused, or while it is the pending draft
+    // being created. Otherwise render a lightweight Text (no NSTextView), which
+    // is what makes opening a collection fast.
+    private var isTitleEditing: Bool {
+        isPendingDraft || focusedField.wrappedValue == .title(item.id)
+    }
+
+    // Builds display text whose line metrics match the editing NSTextView.
+    // TextKit lays out every line at the font's defaultLineHeight; SwiftUI's
+    // intrinsic line height is slightly smaller, so without pinning min/max line
+    // height the row would resize by ~1-2px (accumulating over wrapped lines)
+    // when toggling between display and edit. Pinning makes the two identical.
+    private func displayText(_ string: String, font: NSFont, lineSpacing: CGFloat) -> Text {
+        let paragraph = NSMutableParagraphStyle()
+        let lineHeight = NSLayoutManager().defaultLineHeight(for: font)
+        paragraph.minimumLineHeight = lineHeight
+        paragraph.maximumLineHeight = lineHeight
+        paragraph.lineSpacing = lineSpacing
+        paragraph.lineBreakMode = .byWordWrapping
+        let attributed = NSAttributedString(
+            string: string,
+            attributes: [.font: font, .paragraphStyle: paragraph]
+        )
+        return Text(AttributedString(attributed))
+    }
+
+    // Lightweight display for non-editing rows. Mirrors the typography of the
+    // .title NSTextView style and TaskDragPreview.titleText so swapping to the
+    // NSTextView on focus produces no height or appearance change.
+    private var titleDisplay: some View {
+        displayText(title.isEmpty ? "Title" : title, font: TaskRowLayout.titleFont, lineSpacing: TaskRowLayout.titleLineSpacing)
+            .foregroundStyle(titleDisplayColor)
+            .frame(minHeight: TaskRowLayout.titleLineHeight, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // Capture the click in AppKit window coordinates and consume it so the
+            // row-level hit area does not also fire. Feeds the precise point to the
+            // editor that swaps in, placing the caret where the user clicked.
+            .overlay(
+                TaskRowClickHandler { windowPoint in
+                    focusTitle(at: windowPoint)
+                }
+            )
+    }
+
+    private var titleDisplayColor: HierarchicalShapeStyle {
+        if title.isEmpty {
+            return .tertiary
+        }
+
+        return item.status.dimsTitle ? .secondary : .primary
+    }
+
+    private var titleEditorField: some View {
         ZStack(alignment: .topLeading) {
             if title.isEmpty {
                 Text("Title")
@@ -443,7 +504,44 @@ struct TaskRow: View {
         .animation(.easeInOut(duration: 0.22), value: isNoteFocused)
     }
 
+    @ViewBuilder
     private var noteEditor: some View {
+        if isNoteEditing {
+            noteEditorField
+        } else {
+            noteDisplay
+        }
+    }
+
+    // Edit when the note is focused or a new note body is being drafted.
+    private var isNoteEditing: Bool {
+        isNoteFocused || draftNoteBody != nil
+    }
+
+    // Lightweight display for non-editing notes. Mirrors the .note NSTextView
+    // style and TaskDragPreview.notePreview (including vertical padding) so the
+    // swap to the NSTextView on focus is seamless.
+    private var noteDisplay: some View {
+        displayText(currentNoteBody.isEmpty ? "Note" : currentNoteBody, font: TaskRowLayout.noteFont, lineSpacing: TaskRowLayout.noteLineSpacing)
+            .foregroundStyle(currentNoteBody.isEmpty ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.secondary))
+            .frame(minHeight: TaskRowLayout.noteLineHeight, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 2)
+            // Capture the click in AppKit window coordinates and consume it (so the
+            // row-level title hit area does not steal it). The precise point is
+            // handed to the editor that swaps in, placing the caret at the click.
+            .overlay(
+                TaskRowClickHandler { windowPoint in
+                    guard !isPendingDraft else {
+                        return
+                    }
+
+                    focusTextField(.note(item.id), .nearestInsertionPoint(toWindowPoint: windowPoint))
+                }
+            )
+    }
+
+    private var noteEditorField: some View {
         ZStack(alignment: .topLeading) {
             if currentNoteBody.isEmpty {
                 Text("Note")
