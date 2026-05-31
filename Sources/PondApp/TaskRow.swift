@@ -1777,9 +1777,28 @@ private struct TaskTitleTextView: NSViewRepresentable {
         var needsStyleUpdate = textView.appliedStyleID != style.id
         var needsSizeInvalidation = false
         if !textView.hasMarkedText(), textView.string != text {
+            let wasEmpty = (textView.string as NSString).length == 0
             let selectedRange = textView.selectedRange()
             textView.string = text
-            textView.setSelectedRangeIfNeeded(selectedRange.clamped(to: textView.string))
+            if wasEmpty,
+               selectionBehavior == nil,
+               isFocused {
+                // The editor was just (re)populated from empty while focused.
+                // Crossing the empty→non-empty boundary (the first character, or an
+                // IME commit) flips the `title.isEmpty` branch in the display that is
+                // overlaid behind this editor, and SwiftUI tears down and rebuilds
+                // this NSTextView. A fresh text view starts at selection {0,0}, so
+                // restoring that range would strand the caret at the start; place it
+                // at the end of the inserted text, where the user is typing. We gate
+                // on `isFocused` (the intent) rather than first-responder state
+                // because the rebuilt view is not first responder yet here — focus is
+                // re-established asynchronously below. Explicit caret placements
+                // (split/merge/click/focus) arrive via selectionBehavior and are
+                // honored by the guard above.
+                textView.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
+            } else {
+                textView.setSelectedRangeIfNeeded(selectedRange.clamped(to: textView.string))
+            }
             needsStyleUpdate = true
             needsSizeInvalidation = true
         }
