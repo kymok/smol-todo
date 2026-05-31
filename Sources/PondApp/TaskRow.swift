@@ -402,49 +402,32 @@ struct TaskRow: View {
         isPendingDraft || focusedField.wrappedValue == .title(item.id)
     }
 
-    // Builds display text whose line metrics match the editing NSTextView.
-    // TextKit lays out every line at the font's defaultLineHeight; SwiftUI's
-    // intrinsic line height is slightly smaller, so without pinning min/max line
-    // height the row would resize by ~1-2px (accumulating over wrapped lines)
-    // when toggling between display and edit. Pinning makes the two identical.
-    private func displayText(_ string: String, font: NSFont, lineSpacing: CGFloat) -> Text {
-        let paragraph = NSMutableParagraphStyle()
-        let lineHeight = NSLayoutManager().defaultLineHeight(for: font)
-        paragraph.minimumLineHeight = lineHeight
-        paragraph.maximumLineHeight = lineHeight
-        paragraph.lineSpacing = lineSpacing
-        paragraph.lineBreakMode = .byWordWrapping
-        let attributed = NSAttributedString(
-            string: string,
-            attributes: [.font: font, .paragraphStyle: paragraph]
-        )
-        return Text(AttributedString(attributed))
-    }
-
-    // Lightweight display for non-editing rows. Mirrors the typography of the
-    // .title NSTextView style and TaskDragPreview.titleText so swapping to the
-    // NSTextView on focus produces no height or appearance change.
+    // Lightweight display for non-editing rows. Non-empty text is drawn through
+    // the same TextKit layout/glyph path the editor uses (TaskTextDisplay), so
+    // focusing — which swaps in the NSTextView — is pixel-identical with no glyph
+    // shift. (A SwiftUI Text lays wrapped lines out a couple of points
+    // differently, most visibly for CJK fallback fonts.) The empty placeholder
+    // mirrors titleEditorField's so the empty state is seamless too.
     private var titleDisplay: some View {
-        displayText(title.isEmpty ? "Title" : title, font: TaskRowLayout.titleFont, lineSpacing: TaskRowLayout.titleLineSpacing)
-            .foregroundStyle(titleDisplayColor)
-            .frame(minHeight: TaskRowLayout.titleLineHeight, alignment: .topLeading)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            // Capture the click in AppKit window coordinates and consume it so the
-            // row-level hit area does not also fire. Feeds the precise point to the
-            // editor that swaps in, placing the caret where the user clicked.
-            .overlay(
-                TaskRowClickHandler { windowPoint in
-                    focusTitle(at: windowPoint)
-                }
-            )
-    }
-
-    private var titleDisplayColor: HierarchicalShapeStyle {
-        if title.isEmpty {
-            return .tertiary
+        Group {
+            if title.isEmpty {
+                Text("Title")
+                    .frame(height: TaskRowLayout.titleLineHeight, alignment: .center)
+                    .foregroundStyle(.tertiary)
+            } else {
+                TaskTextDisplay(text: title, style: .title(status: item.status))
+            }
         }
-
-        return item.status.dimsTitle ? .secondary : .primary
+        .frame(minHeight: TaskRowLayout.titleLineHeight, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        // Capture the click in AppKit window coordinates and consume it so the
+        // row-level hit area does not also fire. Feeds the precise point to the
+        // editor that swaps in, placing the caret where the user clicked.
+        .overlay(
+            TaskRowClickHandler { windowPoint in
+                focusTitle(at: windowPoint)
+            }
+        )
     }
 
     private var titleEditorField: some View {
@@ -533,27 +516,36 @@ struct TaskRow: View {
         isNoteFocused || draftNoteBody != nil
     }
 
-    // Lightweight display for non-editing notes. Mirrors the .note NSTextView
-    // style and TaskDragPreview.notePreview (including vertical padding) so the
-    // swap to the NSTextView on focus is seamless.
+    // Lightweight display for non-editing notes. Like titleDisplay, non-empty
+    // text is drawn through the same TextKit path as the .note NSTextView so the
+    // focus swap is pixel-identical; the empty placeholder mirrors
+    // noteEditorField's.
     private var noteDisplay: some View {
-        displayText(currentNoteBody.isEmpty ? "Note" : currentNoteBody, font: TaskRowLayout.noteFont, lineSpacing: TaskRowLayout.noteLineSpacing)
-            .foregroundStyle(currentNoteBody.isEmpty ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.secondary))
-            .frame(minHeight: TaskRowLayout.noteLineHeight, alignment: .topLeading)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 2)
-            // Capture the click in AppKit window coordinates and consume it (so the
-            // row-level title hit area does not steal it). The precise point is
-            // handed to the editor that swaps in, placing the caret at the click.
-            .overlay(
-                TaskRowClickHandler { windowPoint in
-                    guard !isPendingDraft else {
-                        return
-                    }
-
-                    focusTextField(.note(item.id), .nearestInsertionPoint(toWindowPoint: windowPoint))
+        Group {
+            if currentNoteBody.isEmpty {
+                Text("Note")
+                    .frame(height: TaskRowLayout.noteLineHeight, alignment: .center)
+                    .foregroundStyle(.tertiary)
+                    .font(.caption)
+            } else {
+                TaskTextDisplay(text: currentNoteBody, style: .note)
+            }
+        }
+        .frame(minHeight: TaskRowLayout.noteLineHeight, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 2)
+        // Capture the click in AppKit window coordinates and consume it (so the
+        // row-level title hit area does not steal it). The precise point is
+        // handed to the editor that swaps in, placing the caret at the click.
+        .overlay(
+            TaskRowClickHandler { windowPoint in
+                guard !isPendingDraft else {
+                    return
                 }
-            )
+
+                focusTextField(.note(item.id), .nearestInsertionPoint(toWindowPoint: windowPoint))
+            }
+        )
     }
 
     private var noteEditorField: some View {
@@ -1619,6 +1611,112 @@ private struct TaskTextViewStyle {
             maximumLineCount: nil,
             allowsFileDrops: false
         )
+    }
+}
+
+// Draws non-editing text through the same TextKit layout/glyph path as the
+// editing NSTextView (TaskTitleTextView.SelfSizingTextView). Using the identical
+// engine guarantees the on-focus swap to the editor is pixel-for-pixel seamless;
+// a SwiftUI Text positioned wrapped lines a couple of points differently. This is
+// a draw-only NSView with no editing/responder/undo machinery, so non-focused
+// rows stay cheap to instantiate (the point of the original performance change).
+private struct TaskTextDisplay: NSViewRepresentable {
+    let text: String
+    let style: TaskTextViewStyle
+
+    func makeNSView(context: Context) -> TextDrawingView {
+        let view = TextDrawingView()
+        view.configure(text: text, style: style)
+        return view
+    }
+
+    func updateNSView(_ view: TextDrawingView, context: Context) {
+        view.configure(text: text, style: style)
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: TextDrawingView, context: Context) -> CGSize? {
+        let width = proposal.width ?? nsView.bounds.width
+        guard width > 0 else {
+            return CGSize(width: proposal.width ?? 0, height: style.lineHeight)
+        }
+
+        return CGSize(width: width, height: nsView.measuredHeight(fitting: width))
+    }
+}
+
+private final class TextDrawingView: NSView {
+    private let textStorage = NSTextStorage()
+    private let layoutManager = NSLayoutManager()
+    private let textContainer = NSTextContainer()
+    private var minimumMeasuredHeight = TaskRowLayout.titleLineHeight
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        // Mirror SelfSizingTextView's container so layout (and thus wrapping and
+        // height) is identical: zero padding, word wrapping, width-driven.
+        textContainer.lineFragmentPadding = 0
+        textContainer.lineBreakMode = .byWordWrapping
+        layoutManager.addTextContainer(textContainer)
+        textStorage.addLayoutManager(layoutManager)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    // Match the editing NSTextView's top-left text origin.
+    override var isFlipped: Bool { true }
+
+    // Re-resolve the dynamic label colors (and redraw) when light/dark changes.
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
+    }
+
+    func configure(text: String, style: TaskTextViewStyle) {
+        minimumMeasuredHeight = style.lineHeight
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineSpacing = style.lineSpacing
+        paragraph.lineBreakMode = .byWordWrapping
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: style.font,
+            .foregroundColor: style.textColor,
+            .paragraphStyle: paragraph
+        ]
+        textStorage.replaceCharacters(in: NSRange(location: 0, length: textStorage.length), with: text)
+        textStorage.setAttributes(attributes, range: NSRange(location: 0, length: (text as NSString).length))
+        invalidateIntrinsicContentSize()
+        needsDisplay = true
+    }
+
+    func measuredHeight(fitting width: CGFloat) -> CGFloat {
+        guard width > 0 else {
+            return minimumMeasuredHeight
+        }
+
+        textContainer.containerSize = NSSize(width: width, height: CGFloat.greatestFiniteMagnitude)
+        layoutManager.ensureLayout(for: textContainer)
+        let usedHeight = layoutManager.usedRect(for: textContainer).height
+        return max(minimumMeasuredHeight, ceil(usedHeight))
+    }
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: NSView.noIntrinsicMetric, height: measuredHeight(fitting: bounds.width))
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        textContainer.containerSize = NSSize(width: newSize.width, height: CGFloat.greatestFiniteMagnitude)
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        textContainer.containerSize = NSSize(width: bounds.width, height: CGFloat.greatestFiniteMagnitude)
+        layoutManager.ensureLayout(for: textContainer)
+        let glyphRange = layoutManager.glyphRange(for: textContainer)
+        layoutManager.drawBackground(forGlyphRange: glyphRange, at: .zero)
+        layoutManager.drawGlyphs(forGlyphRange: glyphRange, at: .zero)
     }
 }
 
