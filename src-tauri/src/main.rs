@@ -1,10 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-#[allow(dead_code)] // removed when Task 5 (commands.rs) references dto
+mod commands;
 mod dto;
 
 fn main() {
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![commands::get_snapshot])
         .run(tauri::generate_context!())
         .expect("error while running pond-tauri");
 }
