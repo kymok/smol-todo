@@ -588,6 +588,86 @@ impl TaskStore {
     }
 }
 
+impl TaskStore {
+    pub fn merge_item(
+        &self,
+        id: &str,
+        into_previous: &str,
+        title: &str,
+    ) -> Result<Option<TaskItem>> {
+        self.with_file(true, |file| {
+            let source = resolve_index(id, &file.items)?;
+            let previous = resolve_index(into_previous, &file.items)?;
+            let prev_ok = matches!(
+                file.items[previous].status,
+                TaskStatus::Draft | TaskStatus::Ready
+            ) && file.items[previous].note.is_none();
+            if source == previous || !prev_ok {
+                return Ok(None);
+            }
+            let now = Utc::now();
+            let source_note = file.items[source].note.clone();
+            file.items[previous].title.push_str(title);
+            if source_note.is_some() {
+                file.items[previous].note = source_note;
+            }
+            Self::mark_updated(file, previous, now);
+            let merged = file.items[previous].clone();
+            file.items.remove(source);
+            Ok(Some(merged))
+        })
+    }
+
+    pub fn split_item(
+        &self,
+        id: &str,
+        first_title: &str,
+        second_title: &str,
+        requested_second_id: Option<&str>,
+    ) -> Result<TaskItem> {
+        let first = first_title.trim().to_string();
+        let second = second_title.trim().to_string();
+        if first.is_empty() || second.is_empty() {
+            return Err(StoreError::InvalidTitle);
+        }
+        self.with_file(true, |file| {
+            let source = resolve_index(id, &file.items)?;
+            let existing: HashSet<String> = file.items.iter().map(|i| i.id.clone()).collect();
+            let second_id = match requested_second_id {
+                Some(id) => id.to_string(),
+                None => make_id(&existing),
+            };
+            if !is_valid_id(&second_id) {
+                return Err(StoreError::InvalidId(second_id));
+            }
+            if existing.contains(&second_id) {
+                return Err(StoreError::DuplicateId(second_id));
+            }
+            let now = Utc::now();
+            let source_item = file.items[source].clone();
+            file.items[source].title = first;
+            file.items[source].note = None;
+            if file.items[source].status == TaskStatus::Draft {
+                file.items[source].status = TaskStatus::Ready;
+            }
+            Self::mark_updated(file, source, now);
+
+            let mut second_item = TaskItem::new(
+                second_id,
+                second,
+                source_item.collection.clone(),
+                source_item.status,
+                now,
+            );
+            second_item.version =
+                make_version(&file.items.iter().map(|i| i.version.clone()).collect());
+            second_item.note = source_item.note;
+            file.items.insert(source + 1, second_item.clone());
+            Ok(second_item)
+        })
+    }
+}
+
 fn with_extension_suffix(path: &Path, suffix: &str) -> PathBuf {
     let mut name = path
         .file_name()
@@ -929,5 +1009,82 @@ mod tests {
         assert_eq!(status_of("00000001"), TaskStatus::Completed);
         assert_eq!(status_of("00000002"), TaskStatus::Ready);
         assert_eq!(status_of("00000003"), TaskStatus::InProgress);
+    }
+
+    #[test]
+    fn merge_appends_into_previous_draft() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add("Hello", "Inbox", Some("00000001"), false, TaskStatus::Draft)
+            .unwrap();
+        store
+            .add("world", "Inbox", Some("00000002"), false, TaskStatus::Ready)
+            .unwrap();
+        let merged = store
+            .merge_item("00000002", "00000001", " world")
+            .unwrap()
+            .unwrap();
+        assert_eq!(merged.title, "Hello world");
+        assert_eq!(store.items(None, None, &[], None).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn merge_refuses_non_draft_previous() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add("a", "Inbox", Some("00000001"), false, TaskStatus::Completed)
+            .unwrap();
+        store
+            .add("b", "Inbox", Some("00000002"), false, TaskStatus::Ready)
+            .unwrap();
+        assert!(store
+            .merge_item("00000002", "00000001", "b")
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn merge_transfers_source_note() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add("Hello", "Inbox", Some("00000001"), false, TaskStatus::Draft)
+            .unwrap();
+        store
+            .add("world", "Inbox", Some("00000002"), false, TaskStatus::Ready)
+            .unwrap();
+        store.add_note("00000002", "carry me").unwrap();
+        // previous (00000001) is note-less; source (00000002) carries a note.
+        let merged = store
+            .merge_item("00000002", "00000001", " world")
+            .unwrap()
+            .unwrap();
+        assert_eq!(merged.title, "Hello world");
+        assert_eq!(merged.note.as_ref().unwrap().body, "carry me");
+    }
+
+    #[test]
+    fn split_keeps_first_and_inserts_second() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add(
+                "HelloWorld",
+                "Inbox",
+                Some("00000001"),
+                false,
+                TaskStatus::Draft,
+            )
+            .unwrap();
+        let second = store
+            .split_item("00000001", "Hello", "World", Some("00000002"))
+            .unwrap();
+        assert_eq!(second.title, "World");
+        let items = store.items(None, None, &[], None).unwrap();
+        assert_eq!(items[0].title, "Hello");
+        assert_eq!(items[0].status, TaskStatus::Ready); // draft promoted
+        assert_eq!(items[1].title, "World");
     }
 }
