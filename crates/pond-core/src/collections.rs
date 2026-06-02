@@ -1,7 +1,9 @@
 use crate::document::{TaskCollectionGroup, TaskFile};
 use crate::error::{Result, StoreError};
-use crate::model::CollectionColor;
-use std::collections::HashSet;
+use crate::model::{
+    CollectionColor, CollectionGroupSummary, CollectionSummary, TaskItem, TaskStatus,
+};
+use std::collections::{HashMap, HashSet};
 
 pub const DEFAULT_COLLECTION: &str = "Inbox";
 pub const DEFAULT_GROUP: &str = "DefaultGroup";
@@ -263,10 +265,88 @@ pub fn add_collection_if_missing(
     Ok(())
 }
 
+pub fn sorted_collection_names<I: IntoIterator<Item = String>>(collections: I) -> Vec<String> {
+    let mut names = normalized_collection_list(collections.into_iter().collect::<Vec<_>>());
+    names.sort_by_key(|a| a.to_lowercase());
+    let mut ordered: Vec<String> = names
+        .iter()
+        .filter(|n| *n == DEFAULT_COLLECTION)
+        .cloned()
+        .collect();
+    ordered.extend(names.into_iter().filter(|n| n != DEFAULT_COLLECTION));
+    ordered
+}
+
+pub fn collection_status_indicator(items: &[TaskItem]) -> Option<TaskStatus> {
+    if items.iter().any(|i| i.status == TaskStatus::Aborted) {
+        Some(TaskStatus::Aborted)
+    } else if items.iter().any(|i| i.status == TaskStatus::Rejected) {
+        Some(TaskStatus::Rejected)
+    } else if items.iter().any(|i| i.status == TaskStatus::OnHold) {
+        Some(TaskStatus::OnHold)
+    } else {
+        None
+    }
+}
+
+pub fn collection_summary(name: &str, file: &TaskFile) -> CollectionSummary {
+    let items: Vec<&TaskItem> = file.items.iter().filter(|i| i.collection == name).collect();
+    let group_name = collection_group_containing(name, file)
+        .unwrap_or_else(|| collection_group_name_for_api(name));
+    CollectionSummary {
+        name: name.to_string(),
+        display_name: collection_display_name(name),
+        group_name,
+        total_count: items.len(),
+        incomplete_count: items.iter().filter(|i| i.status.is_incomplete()).count(),
+        status_indicator: collection_status_indicator(
+            &items.iter().map(|i| (*i).clone()).collect::<Vec<_>>(),
+        ),
+        color: file
+            .collection_colors
+            .get(name)
+            .copied()
+            .unwrap_or_default(),
+        is_archived: file.archived_collections.contains(name),
+        prompt_template: file.collection_prompts.get(name).cloned(),
+    }
+}
+
+pub fn make_collection_summaries(file: &TaskFile) -> Vec<CollectionSummary> {
+    let mut names = file.collections.clone();
+    names.extend(file.items.iter().map(|i| i.collection.clone()));
+    sorted_collection_names(names)
+        .into_iter()
+        .map(|name| collection_summary(&name, file))
+        .collect()
+}
+
+pub fn make_collection_group_summaries(file: &TaskFile) -> Vec<CollectionGroupSummary> {
+    let summaries = make_collection_summaries(file);
+    // Preserve the sorted order from make_collection_summaries (HashMap key order is
+    // non-deterministic and would make intra-group ordering unstable).
+    let names: Vec<String> = summaries.iter().map(|s| s.name.clone()).collect();
+    let by_name: HashMap<String, CollectionSummary> =
+        summaries.into_iter().map(|s| (s.name.clone(), s)).collect();
+    normalized_collection_groups(&file.collection_groups, &names)
+        .into_iter()
+        .map(|group| CollectionGroupSummary {
+            name: group.name,
+            collections: group
+                .collections
+                .into_iter()
+                .filter_map(|c| by_name.get(&c).cloned())
+                .collect(),
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::document::{TaskCollectionGroup, TaskFile};
+    use crate::model::{CollectionColor as Color, TaskStatus as S};
+    use chrono::{TimeZone, Utc};
 
     #[test]
     fn bare_name_is_default_group() {
@@ -356,5 +436,64 @@ mod tests {
             .iter()
             .find(|g| g.name == "Work")
             .map_or(true, |g| !g.collections.contains(&"A".to_string())));
+    }
+
+    fn item(id: &str, collection: &str, status: S) -> TaskItem {
+        let now = Utc.with_ymd_and_hms(2026, 6, 2, 0, 0, 0).unwrap();
+        let mut it = TaskItem::new(id.into(), "t".into(), collection.into(), status, now);
+        it.version = "v".repeat(12);
+        it
+    }
+
+    #[test]
+    fn default_collection_sorts_first() {
+        let names = sorted_collection_names(vec!["Zebra".into(), "Inbox".into(), "Apple".into()]);
+        assert_eq!(
+            names,
+            vec![
+                "Inbox".to_string(),
+                "Apple".to_string(),
+                "Zebra".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn status_indicator_precedence() {
+        let items = vec![
+            item("00000001", "A", S::OnHold),
+            item("00000002", "A", S::Aborted),
+        ];
+        assert_eq!(collection_status_indicator(&items), Some(S::Aborted));
+    }
+
+    #[test]
+    fn summary_counts_incomplete() {
+        let mut file = TaskFile::default();
+        file.items.push(item("00000001", "Inbox", S::Ready));
+        file.items.push(item("00000002", "Inbox", S::Completed));
+        file.collection_colors.insert("Inbox".into(), Color::Blue);
+        let s = collection_summary("Inbox", &file);
+        assert_eq!(s.total_count, 2);
+        assert_eq!(s.incomplete_count, 1);
+        assert_eq!(s.color, Color::Blue);
+    }
+
+    #[test]
+    fn group_summaries_have_deterministic_sorted_order() {
+        // Collections present only via items (ungrouped) must come back in a stable,
+        // case-insensitively-sorted order with the default collection hoisted first.
+        let mut file = TaskFile::default();
+        file.items.push(item("00000001", "Inbox", S::Ready));
+        file.items.push(item("00000002", "Banana", S::Ready));
+        file.items.push(item("00000003", "Apple", S::Ready));
+        let groups = make_collection_group_summaries(&file);
+        let default = groups.iter().find(|g| g.name == DEFAULT_GROUP).unwrap();
+        let names: Vec<&str> = default
+            .collections
+            .iter()
+            .map(|c| c.name.as_str())
+            .collect();
+        assert_eq!(names, vec!["Inbox", "Apple", "Banana"]);
     }
 }
