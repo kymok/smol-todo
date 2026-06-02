@@ -6,6 +6,8 @@ pub use error::{Result, StoreError};
 
 pub mod model;
 
-pub use model::{CollectionColor, TaskItem, TaskNote, TaskStatus};
+pub use model::{
+    CollectionColor, CollectionGroupSummary, CollectionSummary, TaskItem, TaskNote, TaskStatus,
+};
 
 pub mod ids;

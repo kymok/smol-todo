@@ -113,6 +113,25 @@ impl TaskItem {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CollectionSummary {
+    pub name: String,
+    pub display_name: String,
+    pub group_name: String,
+    pub total_count: usize,
+    pub incomplete_count: usize,
+    pub status_indicator: Option<TaskStatus>,
+    pub color: CollectionColor,
+    pub is_archived: bool,
+    pub prompt_template: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CollectionGroupSummary {
+    pub name: String,
+    pub collections: Vec<CollectionSummary>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,5 +200,26 @@ mod tests {
         assert!(json.contains("\"note\""));
         let round: TaskItem = serde_json::from_str(&json).unwrap();
         assert_eq!(round, item);
+    }
+
+    #[test]
+    fn summary_constructs() {
+        let summary = CollectionSummary {
+            name: "Work/Tasks".into(),
+            display_name: "Tasks".into(),
+            group_name: "Work".into(),
+            total_count: 3,
+            incomplete_count: 2,
+            status_indicator: Some(TaskStatus::OnHold),
+            color: CollectionColor::Blue,
+            is_archived: false,
+            prompt_template: None,
+        };
+        assert_eq!(summary.incomplete_count, 2);
+        let group = CollectionGroupSummary {
+            name: "Work".into(),
+            collections: vec![summary],
+        };
+        assert_eq!(group.collections.len(), 1);
     }
 }
