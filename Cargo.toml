@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/pond-core", "crates/taskpond-cli"]
+members = ["crates/pond-core", "crates/taskpond-cli", "src-tauri"]
 resolver = "2"
 
 [workspace.dependencies]

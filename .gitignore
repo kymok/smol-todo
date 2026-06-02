@@ -9,6 +9,7 @@ tmp/
 
 # Rust / Cargo build output
 /target/
+/src-tauri/gen/
 
 # Node / frontend build output
 node_modules/
