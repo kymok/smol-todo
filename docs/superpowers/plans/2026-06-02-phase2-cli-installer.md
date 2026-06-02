@@ -402,7 +402,7 @@ use crate::output::{CollectionOutput, ItemOutput};
 use crate::parse::{parse_color, parse_status, unescape};
 use clap::{Parser, Subcommand};
 use pond_core::json::to_pretty_sorted;
-use pond_core::{StoreError, TaskStore, DEFAULT_GROUP};
+use pond_core::{StoreError, TaskStore, DEFAULT_COLLECTION, DEFAULT_GROUP};
 use std::io::Write;
 
 #[derive(Debug)]
@@ -623,11 +623,13 @@ Replace the `run_item` stub with real `Create` and `Get` arms (other item arms s
 fn run_item(cmd: ItemCommand, store: &TaskStore, out: &mut dyn Write) -> Result<(), CliError> {
     match cmd {
         ItemCommand::Create { collection, title } => {
-            let title = unescape(&title.join(" "));
-            if title.trim().is_empty() {
+            // Swift fires "Create requires a title." only when no title tokens are given;
+            // a whitespace-only title falls through to store.add, which returns InvalidTitle.
+            if title.is_empty() {
                 return Err(CliError::Usage("Create requires a title.".to_string()));
             }
-            let collection = collection.unwrap_or_else(|| pond_core::DEFAULT_COLLECTION.to_string());
+            let title = unescape(&title.join(" "));
+            let collection = collection.unwrap_or_else(|| DEFAULT_COLLECTION.to_string());
             let item = store.add(&title, &collection, None, false, pond_core::TaskStatus::Ready)?;
             print_items(out, &[item])
         }
@@ -677,6 +679,16 @@ Add these tests to the `cli.rs` `mod tests`:
         let store = TaskStore::new(dir.path().join("tasks.json"));
         let (res, _out) = run_capture(&["taskpond", "item", "create", "-c", "Inbox"], &store);
         assert!(matches!(res, Err(CliError::Usage(m)) if m == "Create requires a title."));
+    }
+
+    #[test]
+    fn create_whitespace_title_is_invalid() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        // A whitespace-only title is not "no title" — it reaches the store, which
+        // rejects it with InvalidTitle (matching Swift).
+        let (res, _out) = run_capture(&["taskpond", "item", "create", "-c", "Inbox", "   "], &store);
+        assert!(matches!(res, Err(CliError::Store(StoreError::InvalidTitle))));
     }
 
     #[test]
