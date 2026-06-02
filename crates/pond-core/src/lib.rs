@@ -3,3 +3,7 @@
 pub mod error;
 
 pub use error::{Result, StoreError};
+
+pub mod model;
+
+pub use model::{CollectionColor, TaskStatus};
