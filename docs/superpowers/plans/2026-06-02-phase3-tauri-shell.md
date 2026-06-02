@@ -150,8 +150,7 @@ export default defineConfig({
     "noUnusedParameters": true,
     "noEmit": true,
     "esModuleInterop": true,
-    "skipLibCheck": true,
-    "types": ["vitest/globals"]
+    "skipLibCheck": true
   },
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]
@@ -221,13 +220,12 @@ describe("frontend toolchain", () => {
 });
 ```
 
-- [ ] **Step 7: Update `.gitignore`** — append:
+- [ ] **Step 7: Update `.gitignore`** — append (`dist/` is already ignored from the pre-existing file, so add only `node_modules/`):
 
 ```gitignore
 
-# Node / frontend build output
+# Node / frontend build output (dist/ already ignored above)
 node_modules/
-dist/
 ```
 
 - [ ] **Step 8: Install, build, typecheck, test**
