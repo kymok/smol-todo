@@ -1,12 +1,18 @@
 use crate::collections::{
-    add_collection_if_missing, make_collection_group_summaries, make_collection_summaries,
-    normalized_collection,
+    add_collection_group_if_missing, add_collection_if_missing, collection_api_name,
+    collection_display_name, collection_exists, collection_group_containing,
+    collection_group_name_for_api, collection_summary, make_collection_group_summaries,
+    make_collection_summaries, move_collection_in_file, normalize_groups_in_file,
+    normalized_collection, normalized_collection_list, normalized_explicit_collection,
+    normalized_explicit_group, remove_collection_from_groups, DEFAULT_COLLECTION,
 };
 use crate::document::TaskFile;
 use crate::error::{Result, StoreError};
 use crate::ids::{is_valid_id, make_id, make_version};
 use crate::json::to_pretty_sorted;
-use crate::model::{CollectionGroupSummary, CollectionSummary, TaskItem, TaskNote, TaskStatus};
+use crate::model::{
+    CollectionColor, CollectionGroupSummary, CollectionSummary, TaskItem, TaskNote, TaskStatus,
+};
 use chrono::{DateTime, Utc};
 use fs2::FileExt;
 use std::collections::{HashMap, HashSet};
@@ -668,6 +674,220 @@ impl TaskStore {
     }
 }
 
+impl TaskStore {
+    fn rename_collection_reference(file: &mut TaskFile, old: &str, new: &str) -> Result<()> {
+        let old = normalized_explicit_collection(old)?;
+        let new = normalized_explicit_collection(new)?;
+        let old_color = file.collection_colors.remove(&old);
+        let old_prompt = file.collection_prompts.remove(&old);
+        let was_archived = file.archived_collections.remove(&old);
+        let new_group = collection_group_name_for_api(&new);
+        for item in file.items.iter_mut().filter(|i| i.collection == old) {
+            item.collection = new.clone();
+        }
+        file.collections.retain(|c| c != &old);
+        file.collections = normalized_collection_list(
+            file.collections
+                .iter()
+                .cloned()
+                .chain([new.clone()])
+                .collect::<Vec<_>>(),
+        );
+        remove_collection_from_groups(&old, file);
+        add_collection_group_if_missing(&new_group, file);
+        if let Some(group) = file
+            .collection_groups
+            .iter_mut()
+            .find(|g| g.name == new_group)
+        {
+            group.collections = normalized_collection_list(
+                group
+                    .collections
+                    .iter()
+                    .cloned()
+                    .chain([new.clone()])
+                    .collect::<Vec<_>>(),
+            );
+        }
+        file.collection_colors
+            .entry(new.clone())
+            .or_insert(old_color.unwrap_or(CollectionColor::Gray));
+        if let Some(prompt) = old_prompt {
+            file.collection_prompts.entry(new.clone()).or_insert(prompt);
+        }
+        if was_archived {
+            file.archived_collections.insert(new);
+        }
+        normalize_groups_in_file(file);
+        Ok(())
+    }
+
+    pub fn create_collection(&self, name: &str, group: &str) -> Result<String> {
+        let reference = crate::collections::parse_reference(name, group)?;
+        let api = reference.api_name();
+        self.with_file(true, |file| {
+            add_collection_if_missing(&api, Some(&reference.group_name), file)?;
+            Ok(api.clone())
+        })
+    }
+
+    pub fn rename_collection(&self, old: &str, new: &str) -> Result<String> {
+        let clean_old = normalized_explicit_collection(old)?;
+        if clean_old == DEFAULT_COLLECTION {
+            return Err(StoreError::DefaultCollection);
+        }
+        if new.trim().is_empty() {
+            return Err(StoreError::InvalidCollection);
+        }
+        self.with_file(true, |file| {
+            if !collection_exists(&clean_old, file) {
+                return Err(StoreError::CollectionNotFound(clean_old.clone()));
+            }
+            let old_group = collection_group_containing(&clean_old, file)
+                .unwrap_or_else(|| collection_group_name_for_api(&clean_old));
+            let reference = crate::collections::parse_reference(new, &old_group)?;
+            let new_name = reference.api_name();
+            if clean_old == new_name {
+                // Renaming to the same api name still ensures the collection exists and is
+                // placed/colored, matching the original app's renameCollection no-op branch.
+                add_collection_if_missing(&new_name, Some(&reference.group_name), file)?;
+                return Ok(new_name);
+            }
+            if collection_exists(&new_name, file) {
+                return Err(StoreError::CollectionConflict(new_name));
+            }
+            Self::rename_collection_reference(file, &clean_old, &new_name)?;
+            Ok(new_name)
+        })
+    }
+
+    pub fn move_collection(&self, name: &str, to_group: &str) -> Result<CollectionSummary> {
+        let clean = normalized_explicit_collection(name)?;
+        let group = normalized_explicit_group(to_group)?;
+        if clean == DEFAULT_COLLECTION {
+            return Err(StoreError::DefaultCollection);
+        }
+        self.with_file(true, |file| {
+            if !collection_exists(&clean, file) {
+                return Err(StoreError::CollectionNotFound(clean.clone()));
+            }
+            let new_name = collection_api_name(&group, &collection_display_name(&clean));
+            if clean != new_name {
+                if collection_exists(&new_name, file) {
+                    return Err(StoreError::CollectionConflict(new_name));
+                }
+                Self::rename_collection_reference(file, &clean, &new_name)?;
+            } else {
+                move_collection_in_file(&clean, &group, file);
+            }
+            Ok(collection_summary(&new_name, file))
+        })
+    }
+
+    pub fn set_collection_color(
+        &self,
+        name: &str,
+        color: CollectionColor,
+    ) -> Result<CollectionSummary> {
+        let clean = normalized_explicit_collection(name)?;
+        self.with_file(true, |file| {
+            if !collection_exists(&clean, file) {
+                return Err(StoreError::CollectionNotFound(clean.clone()));
+            }
+            add_collection_if_missing(&clean, None, file)?;
+            file.collection_colors.insert(clean.clone(), color);
+            Ok(collection_summary(&clean, file))
+        })
+    }
+
+    pub fn set_collection_archived(
+        &self,
+        name: &str,
+        is_archived: bool,
+    ) -> Result<CollectionSummary> {
+        let clean = normalized_explicit_collection(name)?;
+        self.with_file(true, |file| {
+            if !collection_exists(&clean, file) {
+                return Err(StoreError::CollectionNotFound(clean.clone()));
+            }
+            add_collection_if_missing(&clean, None, file)?;
+            if is_archived {
+                file.archived_collections.insert(clean.clone());
+            } else {
+                file.archived_collections.remove(&clean);
+            }
+            Ok(collection_summary(&clean, file))
+        })
+    }
+
+    pub fn set_collection_prompt(
+        &self,
+        name: &str,
+        prompt: Option<&str>,
+    ) -> Result<CollectionSummary> {
+        let clean = normalized_explicit_collection(name)?;
+        let clean_prompt = prompt
+            .map(str::trim)
+            .filter(|p| !p.is_empty())
+            .map(str::to_string);
+        self.with_file(true, |file| {
+            if !collection_exists(&clean, file) {
+                return Err(StoreError::CollectionNotFound(clean.clone()));
+            }
+            add_collection_if_missing(&clean, None, file)?;
+            match clean_prompt {
+                Some(p) => {
+                    file.collection_prompts.insert(clean.clone(), p);
+                }
+                None => {
+                    file.collection_prompts.remove(&clean);
+                }
+            }
+            Ok(collection_summary(&clean, file))
+        })
+    }
+
+    pub fn delete_empty_collection(&self, name: &str) -> Result<bool> {
+        let clean = normalized_explicit_collection(name)?;
+        if clean == DEFAULT_COLLECTION {
+            return Err(StoreError::DefaultCollection);
+        }
+        self.with_file(true, |file| {
+            if file.items.iter().any(|i| i.collection == clean) {
+                return Ok(false);
+            }
+            let before = file.collections.len();
+            file.collections.retain(|c| c != &clean);
+            file.collection_colors.remove(&clean);
+            file.collection_prompts.remove(&clean);
+            file.archived_collections.remove(&clean);
+            remove_collection_from_groups(&clean, file);
+            Ok(file.collections.len() != before)
+        })
+    }
+
+    pub fn delete_collection(&self, name: &str) -> Result<bool> {
+        let clean = normalized_explicit_collection(name)?;
+        if clean == DEFAULT_COLLECTION {
+            return Err(StoreError::DefaultCollection);
+        }
+        self.with_file(true, |file| {
+            if !collection_exists(&clean, file) {
+                return Err(StoreError::CollectionNotFound(clean.clone()));
+            }
+            let before_c = file.collections.len();
+            let before_i = file.items.len();
+            file.collections.retain(|c| c != &clean);
+            file.collection_colors.remove(&clean);
+            file.collection_prompts.remove(&clean);
+            file.archived_collections.remove(&clean);
+            remove_collection_from_groups(&clean, file);
+            file.items.retain(|i| i.collection != clean);
+            Ok(file.collections.len() != before_c || file.items.len() != before_i)
+        })
+    }
+}
+
 fn with_extension_suffix(path: &Path, suffix: &str) -> PathBuf {
     let mut name = path
         .file_name()
@@ -1086,5 +1306,62 @@ mod tests {
         assert_eq!(items[0].title, "Hello");
         assert_eq!(items[0].status, TaskStatus::Ready); // draft promoted
         assert_eq!(items[1].title, "World");
+    }
+
+    #[test]
+    fn create_rename_and_protect_default() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        let created = store
+            .create_collection("Errands", crate::collections::DEFAULT_GROUP)
+            .unwrap();
+        assert_eq!(created, "Errands");
+        let renamed = store.rename_collection("Errands", "Personal").unwrap();
+        assert_eq!(renamed, "Personal");
+        assert_eq!(
+            store.rename_collection("Inbox", "Nope").unwrap_err(),
+            StoreError::DefaultCollection
+        );
+    }
+
+    #[test]
+    fn color_archive_prompt_round_trip() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .create_collection("Work/A", crate::collections::DEFAULT_GROUP)
+            .unwrap();
+        assert_eq!(
+            store
+                .set_collection_color("Work/A", CollectionColor::Blue)
+                .unwrap()
+                .color,
+            CollectionColor::Blue
+        );
+        assert!(
+            store
+                .set_collection_archived("Work/A", true)
+                .unwrap()
+                .is_archived
+        );
+        assert_eq!(
+            store
+                .set_collection_prompt("Work/A", Some("hi"))
+                .unwrap()
+                .prompt_template
+                .as_deref(),
+            Some("hi")
+        );
+    }
+
+    #[test]
+    fn delete_collection_removes_items() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add("a", "Work/A", Some("00000001"), false, TaskStatus::Ready)
+            .unwrap();
+        assert!(store.delete_collection("Work/A").unwrap());
+        assert!(store.items(None, None, &[], None).unwrap().is_empty());
     }
 }
