@@ -19,3 +19,7 @@ pub mod document;
 pub use document::{TaskCollectionGroup, TaskFile};
 
 pub mod paths;
+
+pub mod store;
+
+pub use store::TaskStore;
