@@ -2442,9 +2442,11 @@ Add to `mod tests`:
     fn merge_appends_into_previous_draft() {
         let dir = tempfile::tempdir().unwrap();
         let store = TaskStore::new(dir.path().join("tasks.json"));
-        store.add("Hello ", "Inbox", Some("00000001"), false, TaskStatus::Draft).unwrap();
+        store.add("Hello", "Inbox", Some("00000001"), false, TaskStatus::Draft).unwrap();
         store.add("world", "Inbox", Some("00000002"), false, TaskStatus::Ready).unwrap();
-        let merged = store.merge_item("00000002", "00000001", "world").unwrap().unwrap();
+        // merge appends verbatim (no separator inserted), so the caller includes the space.
+        // (add() trims the stored title, so the separator cannot live on the stored "Hello".)
+        let merged = store.merge_item("00000002", "00000001", " world").unwrap().unwrap();
         assert_eq!(merged.title, "Hello world");
         assert_eq!(store.items(None, None, &[], None).unwrap().len(), 1);
     }
@@ -2456,6 +2458,19 @@ Add to `mod tests`:
         store.add("a", "Inbox", Some("00000001"), false, TaskStatus::Completed).unwrap();
         store.add("b", "Inbox", Some("00000002"), false, TaskStatus::Ready).unwrap();
         assert!(store.merge_item("00000002", "00000001", "b").unwrap().is_none());
+    }
+
+    #[test]
+    fn merge_transfers_source_note() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store.add("Hello", "Inbox", Some("00000001"), false, TaskStatus::Draft).unwrap();
+        store.add("world", "Inbox", Some("00000002"), false, TaskStatus::Ready).unwrap();
+        store.add_note("00000002", "carry me").unwrap();
+        // previous (00000001) is note-less; source (00000002) carries a note.
+        let merged = store.merge_item("00000002", "00000001", " world").unwrap().unwrap();
+        assert_eq!(merged.title, "Hello world");
+        assert_eq!(merged.note.as_ref().unwrap().body, "carry me");
     }
 
     #[test]
