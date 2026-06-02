@@ -4,7 +4,7 @@ use crate::collections::{
     collection_group_name_for_api, collection_summary, make_collection_group_summaries,
     make_collection_summaries, move_collection_in_file, normalize_groups_in_file,
     normalized_collection, normalized_collection_list, normalized_explicit_collection,
-    normalized_explicit_group, remove_collection_from_groups, DEFAULT_COLLECTION,
+    normalized_explicit_group, remove_collection_from_groups, DEFAULT_COLLECTION, DEFAULT_GROUP,
 };
 use crate::document::TaskFile;
 use crate::error::{Result, StoreError};
@@ -888,6 +888,66 @@ impl TaskStore {
     }
 }
 
+impl TaskStore {
+    pub fn create_group(&self, name: &str) -> Result<String> {
+        let clean = normalized_explicit_group(name)?;
+        self.with_file(true, |file| {
+            add_collection_group_if_missing(&clean, file);
+            Ok(clean.clone())
+        })
+    }
+
+    pub fn rename_group(&self, old: &str, new: &str) -> Result<String> {
+        let clean_old = normalized_explicit_group(old)?;
+        let clean_new = normalized_explicit_group(new)?;
+        if clean_old == DEFAULT_GROUP {
+            return Err(StoreError::DefaultCollectionGroup);
+        }
+        self.with_file(true, |file| {
+            normalize_groups_in_file(file);
+            let moved: Vec<String> =
+                match file.collection_groups.iter().find(|g| g.name == clean_old) {
+                    Some(g) => g.collections.clone(),
+                    None => return Err(StoreError::CollectionGroupNotFound(clean_old.clone())),
+                };
+            if clean_old == clean_new {
+                return Ok(clean_new.clone());
+            }
+            for collection in &moved {
+                let target = collection_api_name(&clean_new, &collection_display_name(collection));
+                Self::rename_collection_reference(file, collection, &target)?;
+            }
+            file.collection_groups.retain(|g| g.name != clean_old);
+            add_collection_group_if_missing(&clean_new, file);
+            normalize_groups_in_file(file);
+            Ok(clean_new.clone())
+        })
+    }
+
+    pub fn delete_group(&self, name: &str) -> Result<bool> {
+        let clean = normalized_explicit_group(name)?;
+        if clean == DEFAULT_GROUP {
+            return Err(StoreError::DefaultCollectionGroup);
+        }
+        self.with_file(true, |file| {
+            normalize_groups_in_file(file);
+            let collections: Vec<String> =
+                match file.collection_groups.iter().find(|g| g.name == clean) {
+                    Some(g) => g.collections.clone(),
+                    None => return Err(StoreError::CollectionGroupNotFound(clean.clone())),
+                };
+            file.collection_groups.retain(|g| g.name != clean);
+            for collection in &collections {
+                let target =
+                    collection_api_name(DEFAULT_GROUP, &collection_display_name(collection));
+                Self::rename_collection_reference(file, collection, &target)?;
+            }
+            normalize_groups_in_file(file);
+            Ok(true)
+        })
+    }
+}
+
 fn with_extension_suffix(path: &Path, suffix: &str) -> PathBuf {
     let mut name = path
         .file_name()
@@ -1363,5 +1423,62 @@ mod tests {
             .unwrap();
         assert!(store.delete_collection("Work/A").unwrap());
         assert!(store.items(None, None, &[], None).unwrap().is_empty());
+    }
+
+    #[test]
+    fn create_and_rename_group_moves_collections() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .create_collection("Work/A", crate::collections::DEFAULT_GROUP)
+            .unwrap();
+        store.rename_group("Work", "Office").unwrap();
+        let groups = store.collection_group_summaries().unwrap();
+        assert!(groups.iter().any(|g| g.name == "Office"));
+        assert!(!groups.iter().any(|g| g.name == "Work"));
+        // The member collection's api name must have moved too, not just the group entry.
+        let summaries = store.collection_summaries().unwrap();
+        assert!(
+            summaries.iter().any(|c| c.name == "Office/A"),
+            "collection should be renamed to Office/A"
+        );
+        assert!(
+            !summaries.iter().any(|c| c.name == "Work/A"),
+            "old api name should be gone"
+        );
+    }
+
+    #[test]
+    fn delete_group_moves_collections_to_default() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .create_collection("Work/A", crate::collections::DEFAULT_GROUP)
+            .unwrap();
+        assert!(store.delete_group("Work").unwrap());
+        // "A" should now be a bare default-group collection.
+        assert!(store
+            .collection_summaries()
+            .unwrap()
+            .iter()
+            .any(|c| c.name == "A"));
+    }
+
+    #[test]
+    fn default_group_is_protected() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        assert_eq!(
+            store
+                .rename_group(crate::collections::DEFAULT_GROUP, "X")
+                .unwrap_err(),
+            StoreError::DefaultCollectionGroup
+        );
+        assert_eq!(
+            store
+                .delete_group(crate::collections::DEFAULT_GROUP)
+                .unwrap_err(),
+            StoreError::DefaultCollectionGroup
+        );
     }
 }
