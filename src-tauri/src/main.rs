@@ -2,10 +2,33 @@
 
 mod commands;
 mod dto;
+mod watcher;
+
+use std::time::Duration;
+use tauri::{Emitter, Manager};
 
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![commands::get_snapshot])
+        .setup(|app| {
+            let store_dir = pond_core::paths::default_store_path()
+                .parent()
+                .map(|p| p.to_path_buf());
+            if let Some(dir) = store_dir {
+                std::fs::create_dir_all(&dir).ok();
+                let handle = app.handle().clone();
+                // Keep the watcher alive for the app's lifetime.
+                match watcher::watch_dir(&dir, Duration::from_millis(150), move || {
+                    let _ = handle.emit("store-changed", ());
+                }) {
+                    Ok(w) => {
+                        app.manage(std::sync::Mutex::new(w));
+                    }
+                    Err(e) => eprintln!("store watcher failed to start: {e}"),
+                }
+            }
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running pond-tauri");
 }
