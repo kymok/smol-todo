@@ -1,6 +1,6 @@
 use crate::collections::{
-    add_collection_group_if_missing, add_collection_if_missing, collection_api_name,
-    collection_display_name, collection_exists, collection_group_containing,
+    add_collection_group_if_missing, add_collection_if_missing, assert_can_move_collections,
+    collection_api_name, collection_display_name, collection_exists, collection_group_containing,
     collection_group_name_for_api, collection_summary, make_collection_group_summaries,
     make_collection_summaries, move_collection_in_file, normalize_groups_in_file,
     normalized_collection, normalized_collection_list, normalized_explicit_collection,
@@ -913,6 +913,7 @@ impl TaskStore {
             if clean_old == clean_new {
                 return Ok(clean_new.clone());
             }
+            assert_can_move_collections(&moved, &clean_new, file)?;
             for collection in &moved {
                 let target = collection_api_name(&clean_new, &collection_display_name(collection));
                 Self::rename_collection_reference(file, collection, &target)?;
@@ -936,6 +937,7 @@ impl TaskStore {
                     Some(g) => g.collections.clone(),
                     None => return Err(StoreError::CollectionGroupNotFound(clean.clone())),
                 };
+            assert_can_move_collections(&collections, DEFAULT_GROUP, file)?;
             file.collection_groups.retain(|g| g.name != clean);
             for collection in &collections {
                 let target =
@@ -1480,5 +1482,47 @@ mod tests {
                 .unwrap_err(),
             StoreError::DefaultCollectionGroup
         );
+    }
+
+    #[test]
+    fn rename_group_rejects_display_name_conflict() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .create_collection("Work/A", crate::collections::DEFAULT_GROUP)
+            .unwrap();
+        store
+            .create_collection("Office/A", crate::collections::DEFAULT_GROUP)
+            .unwrap();
+        assert_eq!(
+            store.rename_group("Work", "Office").unwrap_err(),
+            StoreError::CollectionConflict("Office/A".into())
+        );
+        // Nothing changed: both groups still exist.
+        let groups = store.collection_group_summaries().unwrap();
+        assert!(groups.iter().any(|g| g.name == "Work"));
+        assert!(groups.iter().any(|g| g.name == "Office"));
+    }
+
+    #[test]
+    fn delete_group_rejects_display_name_conflict() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .create_collection("Work/A", crate::collections::DEFAULT_GROUP)
+            .unwrap();
+        store
+            .create_collection("A", crate::collections::DEFAULT_GROUP)
+            .unwrap();
+        assert_eq!(
+            store.delete_group("Work").unwrap_err(),
+            StoreError::CollectionConflict("A".into())
+        );
+        // Nothing changed: Work still exists.
+        assert!(store
+            .collection_group_summaries()
+            .unwrap()
+            .iter()
+            .any(|g| g.name == "Work"));
     }
 }

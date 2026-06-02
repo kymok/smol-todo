@@ -233,6 +233,39 @@ pub fn move_collection_in_file(collection: &str, group: &str, file: &mut TaskFil
     normalize_groups_in_file(file);
 }
 
+/// Error if moving `collections` into `group` would collide (by display name) with a
+/// collection already present in that group. Mirrors the original app's
+/// `assertCanMoveCollections` — used before group rename/delete to fail atomically
+/// instead of silently merging collections.
+pub fn assert_can_move_collections(
+    collections: &[String],
+    group: &str,
+    file: &TaskFile,
+) -> Result<()> {
+    let moving: HashSet<String> = collections.iter().cloned().collect();
+    let existing_display_names: HashSet<String> =
+        normalized_collection_groups(&file.collection_groups, &all_collection_names(file))
+            .into_iter()
+            .find(|g| g.name == group)
+            .map(|g| {
+                g.collections
+                    .iter()
+                    .filter(|c| !moving.contains(c.as_str()))
+                    .map(|c| collection_display_name(c))
+                    .collect()
+            })
+            .unwrap_or_default();
+    for collection in collections {
+        let display = collection_display_name(collection);
+        if existing_display_names.contains(&display) {
+            return Err(StoreError::CollectionConflict(collection_api_name(
+                group, &display,
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// Ensure a collection exists (and is colored gray by default), placing it in `group`
 /// when given or in its api-name group when newly added.
 pub fn add_collection_if_missing(
