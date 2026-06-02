@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/pond-core"]
+members = ["crates/pond-core", "crates/taskpond-cli"]
 resolver = "2"
 
 [workspace.dependencies]
