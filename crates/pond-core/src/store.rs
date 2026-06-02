@@ -1,6 +1,10 @@
+use crate::collections::{
+    make_collection_group_summaries, make_collection_summaries, normalized_collection,
+};
 use crate::document::TaskFile;
 use crate::error::{Result, StoreError};
 use crate::json::to_pretty_sorted;
+use crate::model::{CollectionGroupSummary, CollectionSummary, TaskItem, TaskStatus};
 use fs2::FileExt;
 use std::fs::{self, OpenOptions};
 use std::path::{Path, PathBuf};
@@ -10,7 +14,6 @@ pub struct TaskStore {
     lock_path: PathBuf,
 }
 
-#[allow(dead_code)]
 impl TaskStore {
     pub fn new<P: Into<PathBuf>>(file_path: P) -> Self {
         let file_path = file_path.into();
@@ -88,6 +91,76 @@ impl TaskStore {
     }
 }
 
+pub(crate) fn resolve_index(id: &str, items: &[TaskItem]) -> Result<usize> {
+    if let Some(i) = items.iter().position(|it| it.id == id) {
+        return Ok(i);
+    }
+    let matches: Vec<usize> = items
+        .iter()
+        .enumerate()
+        .filter(|(_, it)| it.id.starts_with(id))
+        .map(|(i, _)| i)
+        .collect();
+    match matches.as_slice() {
+        [] => Err(StoreError::NotFound(id.to_string())),
+        [only] => Ok(*only),
+        many => Err(StoreError::AmbiguousId(
+            id.to_string(),
+            many.iter().map(|i| items[*i].id.clone()).collect(),
+        )),
+    }
+}
+
+impl TaskStore {
+    pub fn items(
+        &self,
+        status: Option<TaskStatus>,
+        collection: Option<&str>,
+        ids: &[String],
+        search: Option<&str>,
+    ) -> Result<Vec<TaskItem>> {
+        let clean_collection = match collection {
+            Some(c) => Some(normalized_collection(c)?),
+            None => None,
+        };
+        self.with_file(false, |file| {
+            let mut results: Vec<TaskItem> = if ids.is_empty() {
+                file.items.clone()
+            } else {
+                ids.iter()
+                    .map(|id| resolve_index(id, &file.items).map(|i| file.items[i].clone()))
+                    .collect::<Result<Vec<_>>>()?
+            };
+            if let Some(status) = status {
+                results.retain(|i| i.status == status);
+            }
+            if let Some(ref c) = clean_collection {
+                results.retain(|i| &i.collection == c);
+            }
+            if let Some(query) = search.map(str::trim).filter(|q| !q.is_empty()) {
+                let q = query.to_lowercase();
+                results.retain(|i| {
+                    i.title.to_lowercase().contains(&q)
+                        || i.collection.to_lowercase().contains(&q)
+                        || i.id.contains(&q)
+                        || i.note
+                            .as_ref()
+                            .map_or(false, |n| n.body.to_lowercase().contains(&q))
+                });
+            }
+            Ok(results)
+        })
+    }
+
+    pub fn collection_summaries(&self) -> Result<Vec<CollectionSummary>> {
+        self.with_file(false, |file| Ok(make_collection_summaries(file)))
+    }
+
+    pub fn collection_group_summaries(&self) -> Result<Vec<CollectionGroupSummary>> {
+        self.with_file(false, |file| Ok(make_collection_group_summaries(file)))
+    }
+}
+
 fn with_extension_suffix(path: &Path, suffix: &str) -> PathBuf {
     let mut name = path
         .file_name()
@@ -101,6 +174,8 @@ fn with_extension_suffix(path: &Path, suffix: &str) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::TaskStatus;
+    use chrono::{TimeZone, Utc};
     use tempfile::tempdir;
 
     #[test]
@@ -146,5 +221,63 @@ mod tests {
             .with_file(false, |f| Ok(f.collections.clone()))
             .unwrap();
         assert!(collections.is_empty());
+    }
+
+    fn seed(store: &TaskStore, items: &[(&str, &str, TaskStatus)]) {
+        store
+            .with_file(true, |f| {
+                let now = Utc.with_ymd_and_hms(2026, 6, 2, 0, 0, 0).unwrap();
+                for (id, collection, status) in items {
+                    let mut it =
+                        TaskItem::new((*id).into(), "t".into(), (*collection).into(), *status, now);
+                    it.version = "v".repeat(12);
+                    f.items.push(it);
+                    f.collections = crate::collections::normalized_collection_list(
+                        f.collections
+                            .iter()
+                            .cloned()
+                            .chain([(*collection).to_string()])
+                            .collect::<Vec<_>>(),
+                    );
+                }
+                Ok(())
+            })
+            .unwrap();
+    }
+
+    #[test]
+    fn filters_by_status_and_collection() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        seed(
+            &store,
+            &[
+                ("00000001", "Inbox", TaskStatus::Ready),
+                ("00000002", "Work/A", TaskStatus::Completed),
+            ],
+        );
+        assert_eq!(
+            store
+                .items(Some(TaskStatus::Ready), None, &[], None)
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            store.items(None, Some("Work/A"), &[], None).unwrap().len(),
+            1
+        );
+    }
+
+    #[test]
+    fn resolves_id_by_unique_prefix() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        seed(&store, &[("0123abcd", "Inbox", TaskStatus::Ready)]);
+        let found = store
+            .items(None, None, &["0123".to_string()], None)
+            .unwrap();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].id, "0123abcd");
     }
 }
