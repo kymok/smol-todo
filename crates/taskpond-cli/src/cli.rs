@@ -165,7 +165,29 @@ fn run_item(cmd: ItemCommand, store: &TaskStore, out: &mut dyn Write) -> Result<
             let items = store.items(status, collection.as_deref(), &ids, None)?;
             print_items(out, &items)
         }
-        _ => Ok(()),
+        ItemCommand::Update {
+            id,
+            collection,
+            status,
+            title,
+        } => {
+            let title = if title.is_empty() {
+                None
+            } else {
+                Some(unescape(&title.join(" ")))
+            };
+            let status = match status {
+                Some(s) => Some(parse_status(&s).map_err(CliError::Usage)?),
+                None => None,
+            };
+            let item = store.update(&id, title.as_deref(), collection.as_deref(), status)?;
+            print_items(out, &[item])
+        }
+        ItemCommand::Delete { collection, ids } => {
+            let deleted = store.delete_many(&ids, collection.as_deref())?;
+            print_items(out, &deleted)
+        }
+        ItemCommand::Note { .. } => Ok(()), // filled in Task 7
     }
 }
 
@@ -269,6 +291,68 @@ mod tests {
         assert!(matches!(
             res,
             Err(CliError::Store(StoreError::TargetConflict))
+        ));
+    }
+
+    #[test]
+    fn update_changes_fields() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add(
+                "old",
+                "Inbox",
+                Some("0123abcd"),
+                false,
+                pond_core::TaskStatus::Ready,
+            )
+            .unwrap();
+        let (res, out) = run_capture(
+            &[
+                "taskpond",
+                "item",
+                "update",
+                "0123abcd",
+                "-s",
+                "in-progress",
+                "new",
+                "title",
+            ],
+            &store,
+        );
+        assert!(res.is_ok());
+        assert!(out.contains("\"title\": \"new title\""));
+        assert!(out.contains("\"status\": \"in-progress\""));
+    }
+
+    #[test]
+    fn update_requires_a_field() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add(
+                "a",
+                "Inbox",
+                Some("0123abcd"),
+                false,
+                pond_core::TaskStatus::Ready,
+            )
+            .unwrap();
+        let (res, _out) = run_capture(&["taskpond", "item", "update", "0123abcd"], &store);
+        assert!(matches!(
+            res,
+            Err(CliError::Store(StoreError::MissingUpdate))
+        ));
+    }
+
+    #[test]
+    fn delete_requires_a_target() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        let (res, _out) = run_capture(&["taskpond", "item", "delete"], &store);
+        assert!(matches!(
+            res,
+            Err(CliError::Store(StoreError::MissingTarget))
         ));
     }
 }
