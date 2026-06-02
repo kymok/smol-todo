@@ -1,0 +1,9 @@
+[workspace]
+members = ["crates/pond-core"]
+resolver = "2"
+
+[workspace.dependencies]
+# Pin getrandom to 0.2.x; 0.4+ requires edition 2024 which needs Cargo ≥ 1.85.
+getrandom = "=0.2.15"
+# tempfile 3.27+ pulls in getrandom 0.4; pin to last compatible release.
+tempfile = "=3.8.1"
