@@ -9,7 +9,7 @@ use crate::json::to_pretty_sorted;
 use crate::model::{CollectionGroupSummary, CollectionSummary, TaskItem, TaskStatus};
 use chrono::{DateTime, Utc};
 use fs2::FileExt;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::{self, OpenOptions};
 use std::path::{Path, PathBuf};
 
@@ -315,6 +315,174 @@ impl TaskStore {
     }
 }
 
+impl TaskStore {
+    fn target_collection(ids: &[String], collection: Option<&str>) -> Result<Option<String>> {
+        let clean = match collection {
+            Some(c) => Some(crate::collections::normalized_explicit_collection(c)?),
+            None => None,
+        };
+        if ids.is_empty() && clean.is_none() {
+            return Err(StoreError::MissingTarget);
+        }
+        if !ids.is_empty() && clean.is_some() {
+            return Err(StoreError::TargetConflict);
+        }
+        Ok(clean)
+    }
+
+    fn target_indexes(
+        file: &TaskFile,
+        ids: &[String],
+        collection: &Option<String>,
+    ) -> Result<Vec<usize>> {
+        let mut indexes: Vec<usize> = if let Some(c) = collection {
+            file.items
+                .iter()
+                .enumerate()
+                .filter(|(_, i)| &i.collection == c)
+                .map(|(i, _)| i)
+                .collect()
+        } else {
+            ids.iter()
+                .map(|id| resolve_index(id, &file.items))
+                .collect::<Result<Vec<_>>>()?
+        };
+        indexes.sort_unstable();
+        indexes.dedup();
+        if indexes.is_empty() {
+            return Err(StoreError::NoMatchingTasks);
+        }
+        Ok(indexes)
+    }
+
+    pub fn delete(&self, id: &str) -> Result<()> {
+        self.with_file(true, |file| {
+            let index = resolve_index(id, &file.items)?;
+            file.items.remove(index);
+            Ok(())
+        })
+    }
+
+    pub fn delete_if_current(&self, id: &str, expected: &TaskItem) -> Result<bool> {
+        self.with_file(true, |file| {
+            let index = resolve_index(id, &file.items)?;
+            if &file.items[index] != expected {
+                return Ok(false);
+            }
+            file.items.remove(index);
+            Ok(true)
+        })
+    }
+
+    pub fn delete_many(&self, ids: &[String], collection: Option<&str>) -> Result<Vec<TaskItem>> {
+        let clean = Self::target_collection(ids, collection)?;
+        self.with_file(true, |file| {
+            let mut indexes = Self::target_indexes(file, ids, &clean)?;
+            let deleted: Vec<TaskItem> = indexes.iter().map(|i| file.items[*i].clone()).collect();
+            indexes.sort_unstable_by(|a, b| b.cmp(a));
+            for i in indexes {
+                file.items.remove(i);
+            }
+            Ok(deleted)
+        })
+    }
+
+    pub fn clear_items(&self, collection: &str, completed_only: bool) -> Result<Vec<TaskItem>> {
+        let clean = crate::collections::normalized_explicit_collection(collection)?;
+        self.with_file(true, |file| {
+            let mut indexes: Vec<usize> = file
+                .items
+                .iter()
+                .enumerate()
+                .filter(|(_, i)| {
+                    i.collection == clean && (!completed_only || i.status == TaskStatus::Completed)
+                })
+                .map(|(i, _)| i)
+                .collect();
+            if indexes.is_empty() {
+                return Err(StoreError::NoMatchingTasks);
+            }
+            let deleted: Vec<TaskItem> = indexes.iter().map(|i| file.items[*i].clone()).collect();
+            indexes.sort_unstable_by(|a, b| b.cmp(a));
+            for i in indexes {
+                file.items.remove(i);
+            }
+            Ok(deleted)
+        })
+    }
+
+    pub fn set_status(
+        &self,
+        status: TaskStatus,
+        ids: &[String],
+        collection: Option<&str>,
+    ) -> Result<Vec<TaskItem>> {
+        let clean = Self::target_collection(ids, collection)?;
+        self.with_file(true, |file| {
+            let indexes = Self::target_indexes(file, ids, &clean)?;
+            let now = Utc::now();
+            for i in &indexes {
+                if file.items[*i].status != status {
+                    file.items[*i].status = status;
+                    Self::mark_updated(file, *i, now);
+                }
+            }
+            Ok(indexes.iter().map(|i| file.items[*i].clone()).collect())
+        })
+    }
+
+    pub fn set_status_if_current(
+        &self,
+        status: TaskStatus,
+        id: &str,
+        expected: &TaskItem,
+    ) -> Result<Option<TaskItem>> {
+        self.with_file(true, |file| {
+            let index = resolve_index(id, &file.items)?;
+            if &file.items[index] != expected {
+                return Ok(None);
+            }
+            if file.items[index].status != status {
+                file.items[index].status = status;
+                Self::mark_updated(file, index, Utc::now());
+            }
+            Ok(Some(file.items[index].clone()))
+        })
+    }
+
+    pub fn set_statuses(
+        &self,
+        replacements: &HashMap<TaskStatus, TaskStatus>,
+        ids: &[String],
+        collection: Option<&str>,
+    ) -> Result<Vec<TaskItem>> {
+        let clean = Self::target_collection(ids, collection)?;
+        let meaningful: HashMap<TaskStatus, TaskStatus> = replacements
+            .iter()
+            .filter(|(a, b)| a != b)
+            .map(|(a, b)| (*a, *b))
+            .collect();
+        self.with_file(true, |file| {
+            let all = Self::target_indexes(file, ids, &clean)?;
+            let indexes: Vec<usize> = all
+                .into_iter()
+                .filter(|i| meaningful.contains_key(&file.items[*i].status))
+                .collect();
+            if indexes.is_empty() {
+                return Ok(Vec::new());
+            }
+            let now = Utc::now();
+            for i in &indexes {
+                if let Some(replacement) = meaningful.get(&file.items[*i].status).copied() {
+                    file.items[*i].status = replacement;
+                    Self::mark_updated(file, *i, now);
+                }
+            }
+            Ok(indexes.iter().map(|i| file.items[*i].clone()).collect())
+        })
+    }
+}
+
 fn with_extension_suffix(path: &Path, suffix: &str) -> PathBuf {
     let mut name = path
         .file_name()
@@ -536,5 +704,93 @@ mod tests {
             .unwrap();
         let moved = store.move_item("0123abcd", "Work/A").unwrap();
         assert_eq!(moved.collection, "Work/A");
+    }
+
+    #[test]
+    fn delete_many_requires_exactly_one_target() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add("a", "Inbox", Some("00000001"), false, TaskStatus::Ready)
+            .unwrap();
+        assert_eq!(
+            store.delete_many(&[], None).unwrap_err(),
+            StoreError::MissingTarget
+        );
+        assert_eq!(
+            store
+                .delete_many(&["00000001".into()], Some("Inbox"))
+                .unwrap_err(),
+            StoreError::TargetConflict
+        );
+        assert_eq!(
+            store.delete_many(&["00000001".into()], None).unwrap().len(),
+            1
+        );
+    }
+
+    #[test]
+    fn clear_completed_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add("a", "Inbox", Some("00000001"), false, TaskStatus::Completed)
+            .unwrap();
+        store
+            .add("b", "Inbox", Some("00000002"), false, TaskStatus::Ready)
+            .unwrap();
+        let cleared = store.clear_items("Inbox", true).unwrap();
+        assert_eq!(cleared.len(), 1);
+        assert_eq!(
+            store.items(None, Some("Inbox"), &[], None).unwrap().len(),
+            1
+        );
+    }
+
+    #[test]
+    fn set_status_updates_matching() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add("a", "Inbox", Some("00000001"), false, TaskStatus::Ready)
+            .unwrap();
+        let changed = store
+            .set_status(TaskStatus::Completed, &["00000001".into()], None)
+            .unwrap();
+        assert_eq!(changed[0].status, TaskStatus::Completed);
+    }
+
+    #[test]
+    fn set_statuses_applies_only_mapped_statuses() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add("a", "Inbox", Some("00000001"), false, TaskStatus::Ready)
+            .unwrap();
+        store
+            .add("b", "Inbox", Some("00000002"), false, TaskStatus::Draft)
+            .unwrap();
+        store
+            .add(
+                "c",
+                "Inbox",
+                Some("00000003"),
+                false,
+                TaskStatus::InProgress,
+            )
+            .unwrap();
+        let mut replacements = HashMap::new();
+        replacements.insert(TaskStatus::Ready, TaskStatus::Completed);
+        replacements.insert(TaskStatus::Draft, TaskStatus::Ready);
+        let changed = store
+            .set_statuses(&replacements, &[], Some("Inbox"))
+            .unwrap();
+        // Ready and Draft items are touched; the InProgress item has no mapping.
+        assert_eq!(changed.len(), 2);
+        let items = store.items(None, Some("Inbox"), &[], None).unwrap();
+        let status_of = |id: &str| items.iter().find(|i| i.id == id).unwrap().status;
+        assert_eq!(status_of("00000001"), TaskStatus::Completed);
+        assert_eq!(status_of("00000002"), TaskStatus::Ready);
+        assert_eq!(status_of("00000003"), TaskStatus::InProgress);
     }
 }
