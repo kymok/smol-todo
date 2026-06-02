@@ -2575,6 +2575,9 @@ impl TaskStore {
             let reference = crate::collections::parse_reference(new, &old_group)?;
             let new_name = reference.api_name();
             if clean_old == new_name {
+                // Renaming to the same api name still ensures the collection exists and is
+                // placed/colored, matching the original app's renameCollection no-op branch.
+                add_collection_if_missing(&new_name, Some(&reference.group_name), file)?;
                 return Ok(new_name);
             }
             if collection_exists(&new_name, file) {
