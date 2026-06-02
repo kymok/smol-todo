@@ -86,3 +86,13 @@ The Tauri rewrite lives in `crates/`:
 
 Build/test: `cargo test`. Run the CLI: `cargo run -p taskpond-cli -- item get`.
 The store path honors `POND_STORE`.
+
+### Run the desktop app (Tauri)
+
+Install the Tauri CLI once: `cargo install tauri-cli --version "^2"` (or use `npx @tauri-apps/cli`).
+
+- Dev (hot-reload): `cargo tauri dev` — launches the window against the Vite dev server.
+- The window renders the store read-only; edits made by `taskpond` (the CLI) appear live.
+- The store path honors `POND_STORE`.
+
+Frontend-only checks: `npm test` (Vitest), `npm run build` (typecheck + bundle).
