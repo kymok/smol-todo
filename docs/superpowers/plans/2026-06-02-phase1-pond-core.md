@@ -2828,6 +2828,10 @@ Add to `mod tests`:
         let groups = store.collection_group_summaries().unwrap();
         assert!(groups.iter().any(|g| g.name == "Office"));
         assert!(!groups.iter().any(|g| g.name == "Work"));
+        // The member collection's api name must have moved too, not just the group entry.
+        let summaries = store.collection_summaries().unwrap();
+        assert!(summaries.iter().any(|c| c.name == "Office/A"), "collection should be renamed to Office/A");
+        assert!(!summaries.iter().any(|c| c.name == "Work/A"), "old api name should be gone");
     }
 
     #[test]
