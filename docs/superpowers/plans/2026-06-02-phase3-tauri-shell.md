@@ -332,7 +332,7 @@ mkdir -p src-tauri/icons
 # Minimal 1x1 PNG (sufficient for a debug build; replace before bundling):
 printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82' > src-tauri/icons/icon.png
 ```
-(If `tauri-build`/bundling rejects the 1×1 icon, drop in a normal app icon and report it. It does not affect `cargo build`.)
+**IMPORTANT:** `generate_context!` requires an **RGBA** PNG even for a plain `cargo build` (not just bundling) — a non-RGBA or 1×1 icon makes the build panic with "icon … is not RGBA". Use a real **32×32 RGBA** PNG (color type 6). Generate one with any image tool if needed; the 1×1 snippet above does NOT satisfy this and should be replaced.
 
 - [ ] **Step 7: `src-tauri/src/main.rs`** (minimal builder; command + watcher wired in Tasks 5–6)
 
@@ -354,11 +354,13 @@ cargo build -p pond-tauri
 ```
 Expected: `tauri-build` runs and `cargo build -p pond-tauri` succeeds. (`cargo tauri dev` is for the manual launch in Task 10 and needs the Tauri CLI; it is not required to build the crate here. If `generate_context!` complains that `dist/` is missing, run `npm run build` first.)
 
-- [ ] **Step 9: Lint + commit**
+- [ ] **Step 9: Gitignore the generated dir, lint + commit**
+
+`tauri_build::build()` emits `src-tauri/gen/` (schema JSON) on every `cargo build` — it is build output, not source (like `/target/`). Add `/src-tauri/gen/` to `.gitignore` under the Rust section so it is never committed.
 
 ```bash
 cargo clippy -p pond-tauri -- -D warnings && cargo fmt
-git add Cargo.toml Cargo.lock src-tauri
+git add .gitignore Cargo.toml Cargo.lock src-tauri   # gen/ is now ignored and won't be staged
 git commit -m "feat(app): scaffold pond-tauri (Tauri v2) crate"
 ```
 
