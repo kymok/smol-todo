@@ -187,7 +187,20 @@ fn run_item(cmd: ItemCommand, store: &TaskStore, out: &mut dyn Write) -> Result<
             let deleted = store.delete_many(&ids, collection.as_deref())?;
             print_items(out, &deleted)
         }
-        ItemCommand::Note { .. } => Ok(()), // filled in Task 7
+        ItemCommand::Note { cmd } => match cmd {
+            NoteCommand::Add { id, body } => {
+                let item = store.add_note(&id, &unescape(&body))?;
+                print_items(out, &[item])
+            }
+            NoteCommand::Update { id, body } => {
+                let item = store.update_note(&id, &unescape(&body))?;
+                print_items(out, &[item])
+            }
+            NoteCommand::Delete { id } => {
+                let item = store.delete_note(&id)?;
+                print_items(out, &[item])
+            }
+        },
     }
 }
 
@@ -354,5 +367,53 @@ mod tests {
             res,
             Err(CliError::Store(StoreError::MissingTarget))
         ));
+    }
+
+    #[test]
+    fn note_add_update_delete() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add(
+                "a",
+                "Inbox",
+                Some("0123abcd"),
+                false,
+                pond_core::TaskStatus::Ready,
+            )
+            .unwrap();
+
+        let (res, out) = run_capture(
+            &[
+                "taskpond", "item", "note", "add", "0123abcd", "--body", "hello",
+            ],
+            &store,
+        );
+        assert!(res.is_ok());
+        assert!(out.contains("\"body\": \"hello\""));
+
+        let (res, out) = run_capture(
+            &[
+                "taskpond", "item", "note", "update", "0123abcd", "--body", "world",
+            ],
+            &store,
+        );
+        assert!(res.is_ok());
+        assert!(out.contains("\"body\": \"world\""));
+
+        let (res, out) = run_capture(&["taskpond", "item", "note", "delete", "0123abcd"], &store);
+        assert!(res.is_ok());
+        assert!(!out.contains("\"note\""));
+    }
+
+    #[test]
+    fn note_add_to_missing_item_errors() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        let (res, _out) = run_capture(
+            &["taskpond", "item", "note", "add", "deadbeef", "--body", "x"],
+            &store,
+        );
+        assert!(matches!(res, Err(CliError::Store(StoreError::NotFound(_)))));
     }
 }
