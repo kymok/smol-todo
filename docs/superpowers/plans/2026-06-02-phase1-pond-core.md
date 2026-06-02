@@ -1532,9 +1532,11 @@ pub fn make_collection_summaries(file: &TaskFile) -> Vec<CollectionSummary> {
 
 pub fn make_collection_group_summaries(file: &TaskFile) -> Vec<CollectionGroupSummary> {
     let summaries = make_collection_summaries(file);
+    // Preserve the sorted order from make_collection_summaries (HashMap key order is
+    // non-deterministic and would make intra-group ordering unstable).
+    let names: Vec<String> = summaries.iter().map(|s| s.name.clone()).collect();
     let by_name: std::collections::HashMap<String, CollectionSummary> =
         summaries.into_iter().map(|s| (s.name.clone(), s)).collect();
-    let names: Vec<String> = by_name.keys().cloned().collect();
     normalized_collection_groups(&file.collection_groups, &names)
         .into_iter()
         .map(|group| CollectionGroupSummary {
