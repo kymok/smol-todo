@@ -1,4 +1,6 @@
+use crate::document::{TaskCollectionGroup, TaskFile};
 use crate::error::{Result, StoreError};
+use crate::model::CollectionColor;
 use std::collections::HashSet;
 
 pub const DEFAULT_COLLECTION: &str = "Inbox";
@@ -106,6 +108,161 @@ pub fn normalized_collection_list<I: IntoIterator<Item = String>>(collections: I
     result
 }
 
+pub fn collection_exists(collection: &str, file: &TaskFile) -> bool {
+    file.collections.iter().any(|c| c == collection)
+        || file.items.iter().any(|i| i.collection == collection)
+}
+
+pub fn collection_group_containing(collection: &str, file: &TaskFile) -> Option<String> {
+    normalized_collection_groups(&file.collection_groups, &all_collection_names(file))
+        .into_iter()
+        .find(|g| g.collections.iter().any(|c| c == collection))
+        .map(|g| g.name)
+}
+
+pub(crate) fn all_collection_names(file: &TaskFile) -> Vec<String> {
+    let mut names = file.collections.clone();
+    names.extend(file.items.iter().map(|i| i.collection.clone()));
+    normalized_collection_list(names)
+}
+
+/// Rebuild groups: dedup names, keep the default group first, assign every known
+/// collection to exactly one group (its api-name group if otherwise unassigned).
+pub fn normalized_collection_groups(
+    groups: &[TaskCollectionGroup],
+    collections: &[String],
+) -> Vec<TaskCollectionGroup> {
+    let names = normalized_collection_list(collections.to_vec());
+    let name_set: std::collections::HashSet<&String> = names.iter().collect();
+    let mut seen_groups = std::collections::HashSet::new();
+    let mut assigned = std::collections::HashSet::new();
+    let mut result: Vec<TaskCollectionGroup> = Vec::new();
+
+    for group in groups {
+        let clean_name = group.name.trim();
+        if clean_name.is_empty() || seen_groups.contains(clean_name) {
+            continue;
+        }
+        // Re-canonicalize each listed collection to this group's API name, then keep
+        // only the ones that are real and not already assigned. A collection whose API
+        // name belongs to a different group is dropped here and re-homed below, keeping
+        // group membership consistent with API names (matches the original app).
+        let mapped: Vec<String> = group
+            .collections
+            .iter()
+            .map(|c| collection_api_name(clean_name, &collection_display_name(c)))
+            .collect();
+        let clean_collections: Vec<String> = normalized_collection_list(mapped)
+            .into_iter()
+            .filter(|c| name_set.contains(c) && !assigned.contains(c))
+            .collect();
+        for c in &clean_collections {
+            assigned.insert(c.clone());
+        }
+        seen_groups.insert(clean_name.to_string());
+        result.push(TaskCollectionGroup {
+            name: clean_name.to_string(),
+            collections: clean_collections,
+        });
+    }
+
+    if !seen_groups.contains(DEFAULT_GROUP) {
+        result.insert(
+            0,
+            TaskCollectionGroup {
+                name: DEFAULT_GROUP.to_string(),
+                collections: Vec::new(),
+            },
+        );
+        seen_groups.insert(DEFAULT_GROUP.to_string());
+    }
+
+    for collection in names.iter().filter(|c| !assigned.contains(*c)) {
+        let group_name = collection_group_name_for_api(collection);
+        if let Some(group) = result.iter_mut().find(|g| g.name == group_name) {
+            group.collections.push(collection.clone());
+            group.collections = normalized_collection_list(group.collections.clone());
+        } else {
+            result.push(TaskCollectionGroup {
+                name: group_name,
+                collections: vec![collection.clone()],
+            });
+        }
+    }
+
+    // Default group first, then the rest in encountered order.
+    let mut ordered: Vec<TaskCollectionGroup> = result
+        .iter()
+        .filter(|g| g.name == DEFAULT_GROUP)
+        .cloned()
+        .collect();
+    ordered.extend(result.into_iter().filter(|g| g.name != DEFAULT_GROUP));
+    ordered
+}
+
+pub fn normalize_groups_in_file(file: &mut TaskFile) {
+    let names = all_collection_names(file);
+    file.collection_groups = normalized_collection_groups(&file.collection_groups, &names);
+}
+
+pub fn remove_collection_from_groups(collection: &str, file: &mut TaskFile) {
+    for group in &mut file.collection_groups {
+        group.collections.retain(|c| c != collection);
+    }
+}
+
+pub fn add_collection_group_if_missing(group: &str, file: &mut TaskFile) {
+    normalize_groups_in_file(file);
+    if !file.collection_groups.iter().any(|g| g.name == group) {
+        file.collection_groups.push(TaskCollectionGroup {
+            name: group.to_string(),
+            collections: Vec::new(),
+        });
+    }
+}
+
+pub fn move_collection_in_file(collection: &str, group: &str, file: &mut TaskFile) {
+    add_collection_group_if_missing(group, file);
+    remove_collection_from_groups(collection, file);
+    if let Some(target) = file.collection_groups.iter_mut().find(|g| g.name == group) {
+        target.collections.push(collection.to_string());
+        target.collections = normalized_collection_list(target.collections.clone());
+    }
+    normalize_groups_in_file(file);
+}
+
+/// Ensure a collection exists (and is colored gray by default), placing it in `group`
+/// when given or in its api-name group when newly added.
+pub fn add_collection_if_missing(
+    collection: &str,
+    group: Option<&str>,
+    file: &mut TaskFile,
+) -> Result<()> {
+    let clean = normalized_collection(collection)?;
+    let resolved_group = match group {
+        Some(g) => normalized_explicit_group(g)?,
+        None => collection_group_name_for_api(&clean),
+    };
+    let already = collection_exists(&clean, file);
+    file.collections = normalized_collection_list(
+        file.collections
+            .iter()
+            .cloned()
+            .chain([clean.clone()])
+            .collect::<Vec<_>>(),
+    );
+    file.collection_colors
+        .entry(clean.clone())
+        .or_insert(CollectionColor::Gray);
+
+    if group.is_some() || (!already && collection_group_containing(&clean, file).is_none()) {
+        move_collection_in_file(&clean, &resolved_group, file);
+    } else {
+        normalize_groups_in_file(file);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -149,5 +306,56 @@ mod tests {
         let list =
             normalized_collection_list(vec!["Inbox".into(), "Inbox".into(), "Work/A".into()]);
         assert_eq!(list, vec!["Inbox".to_string(), "Work/A".to_string()]);
+    }
+
+    use crate::document::{TaskCollectionGroup, TaskFile};
+
+    #[test]
+    fn default_group_is_always_present_and_first() {
+        let groups = normalized_collection_groups(&[], &[]);
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].name, DEFAULT_GROUP);
+    }
+
+    #[test]
+    fn unassigned_collections_land_in_their_group() {
+        let groups = normalized_collection_groups(&[], &["Inbox".into(), "Work/A".into()]);
+        let default = groups.iter().find(|g| g.name == DEFAULT_GROUP).unwrap();
+        assert!(default.collections.contains(&"Inbox".to_string()));
+        let work = groups.iter().find(|g| g.name == "Work").unwrap();
+        assert_eq!(work.collections, vec!["Work/A".to_string()]);
+    }
+
+    #[test]
+    fn add_collection_if_missing_colors_gray_and_groups() {
+        let mut file = TaskFile::default();
+        add_collection_if_missing("Work/A", None, &mut file).unwrap();
+        assert!(collection_exists("Work/A", &file));
+        assert_eq!(
+            file.collection_colors.get("Work/A"),
+            Some(&CollectionColor::Gray)
+        );
+        assert_eq!(
+            collection_group_containing("Work/A", &file).as_deref(),
+            Some("Work")
+        );
+    }
+
+    #[test]
+    fn group_membership_follows_api_name() {
+        // A collection listed under a group that doesn't match its API name is re-homed
+        // to the group its API name implies. "A" is a bare (default-group) API name, so
+        // even when listed under "Work" it normalizes into DefaultGroup.
+        let groups = vec![TaskCollectionGroup {
+            name: "Work".into(),
+            collections: vec!["A".into()],
+        }];
+        let normalized = normalized_collection_groups(&groups, &["A".into()]);
+        let default = normalized.iter().find(|g| g.name == DEFAULT_GROUP).unwrap();
+        assert!(default.collections.contains(&"A".to_string()));
+        assert!(normalized
+            .iter()
+            .find(|g| g.name == "Work")
+            .map_or(true, |g| !g.collections.contains(&"A".to_string())));
     }
 }
