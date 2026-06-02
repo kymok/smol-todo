@@ -269,9 +269,9 @@ version = "0.1.0"
 edition = "2021"
 description = "Pond desktop app"
 
-[lib]
-name = "pond_tauri_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# Desktop-only: a plain binary (src/main.rs). No [lib] / mobile-entry split is needed;
+# the dto/commands/watcher modules are declared with `mod` in main.rs, and the bin
+# crate still runs its #[cfg(test)] unit tests under `cargo test -p pond-tauri`.
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
