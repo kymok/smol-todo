@@ -1,5 +1,3 @@
-#![allow(unused_imports)] // TEMPORARY: removed in Task 9 when all handlers are filled in
-
 use crate::output::{CollectionOutput, ItemOutput};
 use crate::parse::{parse_color, parse_status, unescape};
 use clap::{Parser, Subcommand};
@@ -233,7 +231,20 @@ fn run_collection(
             let summary = store.set_collection_color(&unescape(&name), color)?;
             print_collections(out, &[summary])
         }
-        _ => Ok(()), // delete/clear filled in Task 9
+        CollectionCommand::Delete { name } => {
+            let clean = unescape(&name);
+            let summary = store
+                .collection_summaries()?
+                .into_iter()
+                .find(|c| c.name == clean)
+                .ok_or_else(|| CliError::Store(StoreError::CollectionNotFound(clean.clone())))?;
+            store.delete_collection(&clean)?;
+            print_collections(out, &[summary])
+        }
+        CollectionCommand::Clear { name, completed } => {
+            let cleared = store.clear_items(&unescape(&name), completed)?;
+            print_items(out, &cleared)
+        }
     }
 }
 
@@ -497,5 +508,58 @@ mod tests {
             &store,
         );
         assert!(matches!(res, Err(CliError::Usage(m)) if m.contains("Expected 'gray'")));
+    }
+
+    #[test]
+    fn collection_delete_prints_predelete_summary() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add(
+                "a",
+                "Work/A",
+                Some("00000001"),
+                false,
+                pond_core::TaskStatus::Ready,
+            )
+            .unwrap();
+        let (res, out) = run_capture(&["taskpond", "collection", "delete", "Work/A"], &store);
+        assert!(res.is_ok());
+        assert!(out.contains("\"name\": \"Work/A\""));
+        assert!(out.contains("\"totalCount\": 1"));
+        // collection is gone afterward
+        let (_res, out) = run_capture(&["taskpond", "collection", "list"], &store);
+        assert!(!out.contains("Work/A"));
+    }
+
+    #[test]
+    fn collection_clear_completed_only() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add(
+                "done",
+                "Inbox",
+                Some("00000001"),
+                false,
+                pond_core::TaskStatus::Completed,
+            )
+            .unwrap();
+        store
+            .add(
+                "open",
+                "Inbox",
+                Some("00000002"),
+                false,
+                pond_core::TaskStatus::Ready,
+            )
+            .unwrap();
+        let (res, out) = run_capture(
+            &["taskpond", "collection", "clear", "Inbox", "--completed"],
+            &store,
+        );
+        assert!(res.is_ok());
+        assert!(out.contains("done"));
+        assert!(store.items(None, Some("Inbox"), &[], None).unwrap().len() == 1);
     }
 }
