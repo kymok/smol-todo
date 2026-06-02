@@ -1367,7 +1367,13 @@ Port `install`, `uninstall`, and record read/write. Replace the `_unused` shim. 
             installed_at: chrono::Utc::now(),
         };
         let json = crate::json::to_pretty_sorted(&record)?;
-        fs::write(&self.record_path, json.as_bytes())?;
+        // Atomic write (temp + rename), matching the store's write_file and Swift's .atomic,
+        // so a crash mid-write cannot leave a corrupt record file.
+        let mut tmp = self.record_path.clone().into_os_string();
+        tmp.push(".tmp");
+        let tmp_path = PathBuf::from(tmp);
+        fs::write(&tmp_path, json.as_bytes())?;
+        fs::rename(&tmp_path, &self.record_path)?;
         Ok(())
     }
 ```
