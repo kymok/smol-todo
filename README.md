@@ -76,3 +76,13 @@ The GUI settings window can install a `taskpond` symlink into `~/.local/bin/task
 ```text
 Pond.app/Contents/Library/Helpers/taskpond
 ```
+
+## Rust workspace (migration in progress)
+
+The Tauri rewrite lives in `crates/`:
+
+- `pond-core` — the data store + domain logic (also hosts the macOS `cli_install` module).
+- `taskpond-cli` — the `taskpond` CLI binary.
+
+Build/test: `cargo test`. Run the CLI: `cargo run -p taskpond-cli -- item get`.
+The store path honors `POND_STORE`.

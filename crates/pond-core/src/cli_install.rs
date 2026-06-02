@@ -279,7 +279,7 @@ mod tests {
         symlink(&target, &link).unwrap();
         let status = installer.status();
         assert!(status.installed);
-        assert!(status.can_install() == false);
+        assert!(!status.can_install());
     }
 
     #[test]
