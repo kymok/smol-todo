@@ -2868,6 +2868,47 @@ git commit -m "feat(core): add collection group CRUD operations"
 
 ---
 
+## Task 21b: Group rename/delete conflict guard (added after final review)
+
+A final whole-crate review found that `rename_group`/`delete_group` relocated member
+collections without a destination conflict check, silently merging collections (and
+losing color/prompt/archived metadata) when a same-display-name collection already
+existed in the target group. Swift guards this with `assertCanMoveCollections`. The fix:
+
+- Add to `collections.rs`:
+
+```rust
+/// Error if moving `collections` into `group` would collide (by display name) with a
+/// collection already present in that group. Mirrors the original app's
+/// `assertCanMoveCollections` — used before group rename/delete to fail atomically
+/// instead of silently merging collections.
+pub fn assert_can_move_collections(collections: &[String], group: &str, file: &TaskFile) -> Result<()> {
+    let moving: HashSet<String> = collections.iter().cloned().collect();
+    let existing_display_names: HashSet<String> =
+        normalized_collection_groups(&file.collection_groups, &all_collection_names(file))
+            .into_iter()
+            .find(|g| g.name == group)
+            .map(|g| {
+                g.collections
+                    .iter()
+                    .filter(|c| !moving.contains(c.as_str()))
+                    .map(|c| collection_display_name(c))
+                    .collect()
+            })
+            .unwrap_or_default();
+    for collection in collections {
+        let display = collection_display_name(collection);
+        if existing_display_names.contains(&display) {
+            return Err(StoreError::CollectionConflict(collection_api_name(group, &display)));
+        }
+    }
+    Ok(())
+}
+```
+
+- In `store.rs`, call it **before any mutation**: `rename_group` runs `assert_can_move_collections(&moved, &clean_new, file)?;` after the same-name early-return and before the rename loop; `delete_group` runs `assert_can_move_collections(&collections, DEFAULT_GROUP, file)?;` before removing the group entry.
+- Tests `rename_group_rejects_display_name_conflict` and `delete_group_rejects_display_name_conflict` assert `CollectionConflict` is returned and the file is unchanged.
+
 ## Task 22: Prompt templates & export
 
 **Files:**
