@@ -22,6 +22,9 @@ pub use model::{
 };
 pub use store::TaskStore;
 
+#[cfg(unix)]
+pub mod cli_install;
+
 #[cfg(test)]
 mod api_smoke {
     use super::*;
