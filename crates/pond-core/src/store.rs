@@ -6,7 +6,7 @@ use crate::document::TaskFile;
 use crate::error::{Result, StoreError};
 use crate::ids::{is_valid_id, make_id, make_version};
 use crate::json::to_pretty_sorted;
-use crate::model::{CollectionGroupSummary, CollectionSummary, TaskItem, TaskStatus};
+use crate::model::{CollectionGroupSummary, CollectionSummary, TaskItem, TaskNote, TaskStatus};
 use chrono::{DateTime, Utc};
 use fs2::FileExt;
 use std::collections::{HashMap, HashSet};
@@ -483,6 +483,111 @@ impl TaskStore {
     }
 }
 
+impl TaskStore {
+    fn put_note(item: &mut TaskItem, body: &str, now: chrono::DateTime<Utc>) {
+        let id = item
+            .note
+            .as_ref()
+            .map(|n| n.id.clone())
+            .unwrap_or_else(|| make_id(&HashSet::new()));
+        item.note = Some(TaskNote {
+            id,
+            version: make_version(&HashSet::new()),
+            body: body.to_string(),
+            created_at: now,
+            updated_at: now,
+        });
+    }
+
+    pub fn add_note(&self, id: &str, body: &str) -> Result<TaskItem> {
+        let clean = body.trim();
+        if clean.is_empty() {
+            return Err(StoreError::InvalidNote);
+        }
+        self.with_file(true, |file| {
+            let index = resolve_index(id, &file.items)?;
+            let now = Utc::now();
+            Self::put_note(&mut file.items[index], clean, now);
+            Self::mark_updated(file, index, now);
+            Ok(file.items[index].clone())
+        })
+    }
+
+    pub fn add_note_if_current(
+        &self,
+        id: &str,
+        body: &str,
+        expected: &TaskItem,
+    ) -> Result<Option<TaskItem>> {
+        let clean = body.trim();
+        if clean.is_empty() {
+            return Err(StoreError::InvalidNote);
+        }
+        self.with_file(true, |file| {
+            let index = resolve_index(id, &file.items)?;
+            if &file.items[index] != expected {
+                return Ok(None);
+            }
+            let now = Utc::now();
+            Self::put_note(&mut file.items[index], clean, now);
+            Self::mark_updated(file, index, now);
+            Ok(Some(file.items[index].clone()))
+        })
+    }
+
+    pub fn update_note(&self, id: &str, body: &str) -> Result<TaskItem> {
+        let clean = body.trim();
+        if clean.is_empty() {
+            return Err(StoreError::InvalidNote);
+        }
+        self.with_file(true, |file| {
+            let index = resolve_index(id, &file.items)?;
+            let changed = match file.items[index].note.as_mut() {
+                Some(note) if note.body != clean => {
+                    note.body = clean.to_string();
+                    note.updated_at = Utc::now();
+                    note.version = make_version(&HashSet::new());
+                    true
+                }
+                Some(_) => false,
+                None => return Err(StoreError::NoteNotFound(id.to_string())),
+            };
+            if changed {
+                Self::mark_updated(file, index, Utc::now());
+            }
+            Ok(file.items[index].clone())
+        })
+    }
+
+    pub fn delete_note(&self, id: &str) -> Result<TaskItem> {
+        self.with_file(true, |file| {
+            let index = resolve_index(id, &file.items)?;
+            if file.items[index].note.is_none() {
+                return Err(StoreError::NoteNotFound(id.to_string()));
+            }
+            file.items[index].note = None;
+            Self::mark_updated(file, index, Utc::now());
+            Ok(file.items[index].clone())
+        })
+    }
+
+    pub fn delete_note_if_current(
+        &self,
+        id: &str,
+        expected: &TaskItem,
+    ) -> Result<Option<TaskItem>> {
+        self.with_file(true, |file| {
+            let index = resolve_index(id, &file.items)?;
+            if &file.items[index] != expected {
+                return Ok(None);
+            }
+            file.items[index].note = None;
+            Self::mark_updated(file, index, Utc::now());
+            Ok(Some(file.items[index].clone()))
+        })
+    }
+}
+
 fn with_extension_suffix(path: &Path, suffix: &str) -> PathBuf {
     let mut name = path
         .file_name()
@@ -758,6 +863,38 @@ mod tests {
             .set_status(TaskStatus::Completed, &["00000001".into()], None)
             .unwrap();
         assert_eq!(changed[0].status, TaskStatus::Completed);
+    }
+
+    #[test]
+    fn add_then_update_then_delete_note() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add("a", "Inbox", Some("00000001"), false, TaskStatus::Ready)
+            .unwrap();
+        let with_note = store.add_note("00000001", "  hello  ").unwrap();
+        assert_eq!(with_note.note.as_ref().unwrap().body, "hello");
+        let updated = store.update_note("00000001", "world").unwrap();
+        assert_eq!(updated.note.as_ref().unwrap().body, "world");
+        let cleared = store.delete_note("00000001").unwrap();
+        assert!(cleared.note.is_none());
+    }
+
+    #[test]
+    fn empty_note_rejected_and_missing_note_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add("a", "Inbox", Some("00000001"), false, TaskStatus::Ready)
+            .unwrap();
+        assert_eq!(
+            store.add_note("00000001", "   ").unwrap_err(),
+            StoreError::InvalidNote
+        );
+        assert_eq!(
+            store.delete_note("00000001").unwrap_err(),
+            StoreError::NoteNotFound("00000001".into())
+        );
     }
 
     #[test]
