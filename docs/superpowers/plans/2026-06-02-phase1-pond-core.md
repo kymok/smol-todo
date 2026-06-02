@@ -2021,7 +2021,7 @@ Mirrors `delete`, `delete(ids/collection)`, `clearItems`, `setStatus`, `setStatu
 - [ ] **Step 1: Write the failing test** — add to `store.rs` (new `impl` block):
 
 ```rust
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 impl TaskStore {
     fn target_collection(ids: &[String], collection: Option<&str>) -> Result<Option<String>> {
@@ -2137,12 +2137,12 @@ impl TaskStore {
 
     pub fn set_statuses(
         &self,
-        replacements: &BTreeMap<TaskStatus, TaskStatus>,
+        replacements: &HashMap<TaskStatus, TaskStatus>,
         ids: &[String],
         collection: Option<&str>,
     ) -> Result<Vec<TaskItem>> {
         let clean = Self::target_collection(ids, collection)?;
-        let meaningful: BTreeMap<TaskStatus, TaskStatus> =
+        let meaningful: HashMap<TaskStatus, TaskStatus> =
             replacements.iter().filter(|(a, b)| a != b).map(|(a, b)| (*a, *b)).collect();
         self.with_file(true, |file| {
             let all = Self::target_indexes(file, ids, &clean)?;
