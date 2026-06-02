@@ -1,8 +1,6 @@
 //! Command-line installer: symlinks `~/.local/bin/taskpond` at the bundled binary.
 //! Unix-only (macOS-primary); port of the Swift `CommandLineInstaller`.
 #![cfg(unix)]
-// `Result` and `is_executable` are used by Task 11; allow until then.
-#![allow(unused_imports, dead_code)]
 
 use crate::error::{Result, StoreError};
 use crate::paths::data_directory;
@@ -168,8 +166,87 @@ impl Installer {
             .unwrap_or(false)
     }
 
-    pub(crate) fn _unused(&self) {
-        let _ = StoreError::InvalidTitle; // keep StoreError import until Task 11 uses it
+    pub fn install(&self) -> Result<()> {
+        if !Self::is_executable(&self.target_path) {
+            return Err(StoreError::Io(format!(
+                "CLI executable was not found at {}.",
+                self.target_path.display()
+            )));
+        }
+        if let Some(parent) = self.link_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        match link_kind(&self.link_path) {
+            LinkKind::Missing => {
+                std::os::unix::fs::symlink(&self.target_path, &self.link_path)?;
+                self.write_record()
+            }
+            LinkKind::File => Err(StoreError::Io(format!(
+                "{} already exists and is not a symlink created by Pond.",
+                self.link_path.display()
+            ))),
+            LinkKind::Symlink(dest) => {
+                if dest == self.target_path {
+                    self.write_record()
+                } else if self.can_remove_symlink(&dest) {
+                    fs::remove_file(&self.link_path)?;
+                    std::os::unix::fs::symlink(&self.target_path, &self.link_path)?;
+                    self.write_record()
+                } else {
+                    Err(StoreError::Io(format!(
+                        "{} already points to {}.",
+                        self.link_path.display(),
+                        dest.display()
+                    )))
+                }
+            }
+        }
+    }
+
+    pub fn uninstall(&self) -> Result<()> {
+        match link_kind(&self.link_path) {
+            LinkKind::Missing => {
+                let _ = fs::remove_file(&self.record_path);
+                Ok(())
+            }
+            LinkKind::File => Err(StoreError::Io(format!(
+                "{} already exists and is not a symlink created by Pond.",
+                self.link_path.display()
+            ))),
+            LinkKind::Symlink(dest) => {
+                if self.can_remove_symlink(&dest) {
+                    fs::remove_file(&self.link_path)?;
+                    let _ = fs::remove_file(&self.record_path);
+                    Ok(())
+                } else {
+                    Err(StoreError::Io(format!(
+                        "{} already points to {}.",
+                        self.link_path.display(),
+                        dest.display()
+                    )))
+                }
+            }
+        }
+    }
+
+    fn write_record(&self) -> Result<()> {
+        if let Some(parent) = self.record_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let record = InstallRecord {
+            link_path: self.link_path.to_string_lossy().to_string(),
+            target_path: self.target_path.to_string_lossy().to_string(),
+            installed_at: chrono::Utc::now(),
+        };
+        let json = crate::json::to_pretty_sorted(&record)?;
+        // Atomic write (temp + rename), matching the store's write_file and Swift's .atomic,
+        // so a crash mid-write cannot leave a corrupt record file.
+        let mut tmp = self.record_path.clone().into_os_string();
+        tmp.push(".tmp");
+        let tmp_path = PathBuf::from(tmp);
+        fs::write(&tmp_path, json.as_bytes())?;
+        fs::rename(&tmp_path, &self.record_path)?;
+        Ok(())
     }
 }
 
@@ -223,5 +300,48 @@ mod tests {
             .unwrap()
             .contains("points to"));
         assert!(!status.can_uninstall); // foreign symlink, no record
+    }
+
+    #[test]
+    fn install_then_uninstall_round_trip() {
+        let dir = tempdir().unwrap();
+        let target = dir.path().join("taskpond-bin");
+        make_executable(&target);
+        let link = dir.path().join("bin/taskpond");
+        let record = dir.path().join("cli-install.json");
+        let installer = Installer::new(link.clone(), target.clone(), record.clone());
+
+        installer.install().unwrap();
+        assert!(installer.status().installed);
+        assert!(record.exists());
+
+        installer.uninstall().unwrap();
+        assert!(!installer.status().installed);
+        assert!(!record.exists());
+        assert!(fs::symlink_metadata(&link).is_err()); // link removed
+    }
+
+    #[test]
+    fn install_rejects_missing_executable() {
+        let dir = tempdir().unwrap();
+        let installer = Installer::new(
+            dir.path().join("link"),
+            dir.path().join("does-not-exist"),
+            dir.path().join("rec.json"),
+        );
+        let err = installer.install().unwrap_err();
+        assert!(format!("{err}").contains("was not found"));
+    }
+
+    #[test]
+    fn install_refuses_to_clobber_foreign_file() {
+        let dir = tempdir().unwrap();
+        let target = dir.path().join("taskpond-bin");
+        make_executable(&target);
+        let link = dir.path().join("link");
+        fs::write(&link, b"i am a real file").unwrap();
+        let installer = Installer::new(link, target, dir.path().join("rec.json"));
+        let err = installer.install().unwrap_err();
+        assert!(format!("{err}").contains("not a symlink created by Pond"));
     }
 }
