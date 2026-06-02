@@ -2953,7 +2953,7 @@ pub enum ExportFormat {
     Jsonl,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportPayload {
     pub collection: String,
