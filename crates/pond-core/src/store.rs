@@ -7,7 +7,7 @@ use crate::error::{Result, StoreError};
 use crate::ids::{is_valid_id, make_id, make_version};
 use crate::json::to_pretty_sorted;
 use crate::model::{CollectionGroupSummary, CollectionSummary, TaskItem, TaskStatus};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use fs2::FileExt;
 use std::collections::HashSet;
 use std::fs::{self, OpenOptions};
@@ -213,6 +213,108 @@ impl TaskStore {
     }
 }
 
+impl TaskStore {
+    fn mark_updated(file: &mut TaskFile, index: usize, now: DateTime<Utc>) {
+        file.items[index].updated_at = now;
+        let mut existing: HashSet<String> = file.items.iter().map(|i| i.version.clone()).collect();
+        existing.remove(&file.items[index].version);
+        file.items[index].version = make_version(&existing);
+    }
+
+    fn apply_update(
+        file: &mut TaskFile,
+        index: usize,
+        title: Option<&str>,
+        collection: Option<&str>,
+        status: Option<TaskStatus>,
+    ) -> Result<bool> {
+        let mut changed = false;
+        if let Some(title) = title {
+            if file.items[index].title != title {
+                file.items[index].title = title.to_string();
+                changed = true;
+            }
+        }
+        if let Some(collection) = collection {
+            add_collection_if_missing(collection, None, file)?;
+            if file.items[index].collection != collection {
+                file.items[index].collection = collection.to_string();
+                changed = true;
+            }
+        }
+        if let Some(status) = status {
+            if file.items[index].status != status {
+                file.items[index].status = status;
+                changed = true;
+            }
+        }
+        Ok(changed)
+    }
+
+    pub fn update(
+        &self,
+        id: &str,
+        title: Option<&str>,
+        collection: Option<&str>,
+        status: Option<TaskStatus>,
+    ) -> Result<TaskItem> {
+        let clean_collection = match collection {
+            Some(c) => Some(normalized_collection(c)?),
+            None => None,
+        };
+        if title.is_none() && clean_collection.is_none() && status.is_none() {
+            return Err(StoreError::MissingUpdate);
+        }
+        self.with_file(true, |file| {
+            let index = resolve_index(id, &file.items)?;
+            if Self::apply_update(file, index, title, clean_collection.as_deref(), status)? {
+                Self::mark_updated(file, index, Utc::now());
+            }
+            Ok(file.items[index].clone())
+        })
+    }
+
+    pub fn update_if_current(
+        &self,
+        id: &str,
+        title: Option<&str>,
+        collection: Option<&str>,
+        status: Option<TaskStatus>,
+        expected: &TaskItem,
+    ) -> Result<Option<TaskItem>> {
+        let clean_collection = match collection {
+            Some(c) => Some(normalized_collection(c)?),
+            None => None,
+        };
+        if title.is_none() && clean_collection.is_none() && status.is_none() {
+            return Err(StoreError::MissingUpdate);
+        }
+        self.with_file(true, |file| {
+            let index = resolve_index(id, &file.items)?;
+            if &file.items[index] != expected {
+                return Ok(None);
+            }
+            if Self::apply_update(file, index, title, clean_collection.as_deref(), status)? {
+                Self::mark_updated(file, index, Utc::now());
+            }
+            Ok(Some(file.items[index].clone()))
+        })
+    }
+
+    pub fn move_item(&self, id: &str, collection: &str) -> Result<TaskItem> {
+        let clean = normalized_collection(collection)?;
+        self.with_file(true, |file| {
+            let index = resolve_index(id, &file.items)?;
+            add_collection_if_missing(&clean, None, file)?;
+            if file.items[index].collection != clean {
+                file.items[index].collection = clean.clone();
+                Self::mark_updated(file, index, Utc::now());
+            }
+            Ok(file.items[index].clone())
+        })
+    }
+}
+
 fn with_extension_suffix(path: &Path, suffix: &str) -> PathBuf {
     let mut name = path
         .file_name()
@@ -382,5 +484,57 @@ mod tests {
                 .unwrap_err(),
             StoreError::InvalidId("xyz".into())
         );
+    }
+
+    #[test]
+    fn update_bumps_version_and_timestamp() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        let created = store
+            .add("a", "Inbox", Some("0123abcd"), false, TaskStatus::Ready)
+            .unwrap();
+        let updated = store.update("0123abcd", Some("a2"), None, None).unwrap();
+        assert_eq!(updated.title, "a2");
+        assert_ne!(updated.version, created.version);
+    }
+
+    #[test]
+    fn update_requires_a_field() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add("a", "Inbox", Some("0123abcd"), false, TaskStatus::Ready)
+            .unwrap();
+        assert_eq!(
+            store.update("0123abcd", None, None, None).unwrap_err(),
+            StoreError::MissingUpdate
+        );
+    }
+
+    #[test]
+    fn if_current_skips_on_mismatch() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        let created = store
+            .add("a", "Inbox", Some("0123abcd"), false, TaskStatus::Ready)
+            .unwrap();
+        store
+            .update("0123abcd", Some("changed"), None, None)
+            .unwrap(); // now stale
+        let result = store
+            .update_if_current("0123abcd", Some("x"), None, None, &created)
+            .unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn move_changes_collection() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add("a", "Inbox", Some("0123abcd"), false, TaskStatus::Ready)
+            .unwrap();
+        let moved = store.move_item("0123abcd", "Work/A").unwrap();
+        assert_eq!(moved.collection, "Work/A");
     }
 }
