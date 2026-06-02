@@ -4,7 +4,7 @@ use crate::output::{CollectionOutput, ItemOutput};
 use crate::parse::{parse_color, parse_status, unescape};
 use clap::{Parser, Subcommand};
 use pond_core::json::to_pretty_sorted;
-use pond_core::{StoreError, TaskStore, DEFAULT_GROUP};
+use pond_core::{StoreError, TaskStore, DEFAULT_COLLECTION, DEFAULT_GROUP};
 use std::io::Write;
 
 #[derive(Debug)]
@@ -131,11 +131,48 @@ pub fn run(args: &[String], store: &TaskStore, out: &mut dyn Write) -> Result<()
     }
 }
 
-#[allow(clippy::match_single_binding)]
-fn run_item(cmd: ItemCommand, _store: &TaskStore, _out: &mut dyn Write) -> Result<(), CliError> {
+fn run_item(cmd: ItemCommand, store: &TaskStore, out: &mut dyn Write) -> Result<(), CliError> {
     match cmd {
-        _ => Ok(()), // handlers filled in Tasks 5-7
+        ItemCommand::Create { collection, title } => {
+            // Swift fires "Create requires a title." only when no title tokens are given;
+            // a whitespace-only title falls through to store.add, which returns InvalidTitle.
+            if title.is_empty() {
+                return Err(CliError::Usage("Create requires a title.".to_string()));
+            }
+            let title = unescape(&title.join(" "));
+            let collection = collection.unwrap_or_else(|| DEFAULT_COLLECTION.to_string());
+            let item = store.add(
+                &title,
+                &collection,
+                None,
+                false,
+                pond_core::TaskStatus::Ready,
+            )?;
+            print_items(out, &[item])
+        }
+        ItemCommand::Get {
+            status,
+            collection,
+            ids,
+        } => {
+            if collection.is_some() && !ids.is_empty() {
+                return Err(CliError::Store(StoreError::TargetConflict));
+            }
+            let status = match status {
+                Some(s) => Some(parse_status(&s).map_err(CliError::Usage)?),
+                None => None,
+            };
+            let items = store.items(status, collection.as_deref(), &ids, None)?;
+            print_items(out, &items)
+        }
+        _ => Ok(()),
     }
+}
+
+fn print_items(out: &mut dyn Write, items: &[pond_core::TaskItem]) -> Result<(), CliError> {
+    let outputs: Vec<ItemOutput> = items.iter().map(ItemOutput::from_item).collect();
+    let json = to_pretty_sorted(&outputs).map_err(CliError::Store)?;
+    writeln!(out, "{json}").map_err(|e| CliError::Usage(e.to_string()))
 }
 
 #[allow(clippy::match_single_binding)]
@@ -168,5 +205,70 @@ mod tests {
         let store = TaskStore::new(dir.path().join("tasks.json"));
         let (res, _out) = run_capture(&["taskpond", "bogus"], &store);
         assert!(matches!(res, Err(CliError::Parse(_))));
+    }
+
+    #[test]
+    fn create_then_get_round_trips_json() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        let (res, out) = run_capture(
+            &["taskpond", "item", "create", "-c", "Inbox", "Buy", "milk"],
+            &store,
+        );
+        assert!(res.is_ok());
+        assert!(out.contains("\"title\": \"Buy milk\""));
+        assert!(out.contains("\"status\": \"ready\""));
+        assert!(out.contains("\"collection\": \"Inbox\""));
+
+        let (res, out) = run_capture(&["taskpond", "item", "get"], &store);
+        assert!(res.is_ok());
+        assert!(out.contains("Buy milk"));
+    }
+
+    #[test]
+    fn create_requires_a_title() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        let (res, _out) = run_capture(&["taskpond", "item", "create", "-c", "Inbox"], &store);
+        assert!(matches!(res, Err(CliError::Usage(m)) if m == "Create requires a title."));
+    }
+
+    #[test]
+    fn create_whitespace_title_is_invalid() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        // A whitespace-only title is not "no title" — it reaches the store, which
+        // rejects it with InvalidTitle (matching Swift).
+        let (res, _out) = run_capture(
+            &["taskpond", "item", "create", "-c", "Inbox", "   "],
+            &store,
+        );
+        assert!(matches!(
+            res,
+            Err(CliError::Store(StoreError::InvalidTitle))
+        ));
+    }
+
+    #[test]
+    fn get_rejects_collection_and_ids_together() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add(
+                "a",
+                "Inbox",
+                Some("00000001"),
+                false,
+                pond_core::TaskStatus::Ready,
+            )
+            .unwrap();
+        let (res, _out) = run_capture(
+            &["taskpond", "item", "get", "-c", "Inbox", "00000001"],
+            &store,
+        );
+        assert!(matches!(
+            res,
+            Err(CliError::Store(StoreError::TargetConflict))
+        ));
     }
 }
