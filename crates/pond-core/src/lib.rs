@@ -17,3 +17,5 @@ pub mod json;
 pub mod document;
 
 pub use document::{TaskCollectionGroup, TaskFile};
+
+pub mod paths;
