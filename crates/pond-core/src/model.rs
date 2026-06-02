@@ -1,4 +1,7 @@
+use crate::ids::make_version;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -58,9 +61,62 @@ pub enum CollectionColor {
     Purple,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskNote {
+    pub id: String,
+    pub version: String,
+    pub body: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: DateTime<Utc>,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TaskItem {
+    pub id: String,
+    pub version: String,
+    pub title: String,
+    pub collection: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<TaskNote>,
+    pub status: TaskStatus,
+    #[serde(rename = "createdAt")]
+    pub created_at: DateTime<Utc>,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: DateTime<Utc>,
+}
+
+impl TaskItem {
+    /// Build an item with a **provisional** random `version`. The persisted
+    /// uniqueness guarantee lives in the store layer: when an item is saved, the
+    /// store overwrites `version` with one generated against the set of all
+    /// existing versions. `new` has no knowledge of existing versions, so this
+    /// value is only a placeholder until the item is persisted.
+    pub fn new(
+        id: String,
+        title: String,
+        collection: String,
+        status: TaskStatus,
+        now: DateTime<Utc>,
+    ) -> Self {
+        TaskItem {
+            id,
+            version: make_version(&HashSet::new()),
+            title,
+            collection,
+            note: None,
+            status,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::TimeZone;
 
     #[test]
     fn status_serializes_to_raw_values() {
@@ -96,5 +152,34 @@ mod tests {
         let parsed: CollectionColor = serde_json::from_str("\"green\"").unwrap();
         assert_eq!(parsed, CollectionColor::Green);
         assert_eq!(CollectionColor::default(), CollectionColor::Gray);
+    }
+
+    #[test]
+    fn item_serializes_note_as_singular_and_omits_when_absent() {
+        let now = chrono::Utc.with_ymd_and_hms(2026, 6, 2, 12, 0, 0).unwrap();
+        let mut item = TaskItem::new(
+            "0123abcd".into(),
+            "Buy milk".into(),
+            "Inbox".into(),
+            TaskStatus::Ready,
+            now,
+        );
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(
+            !json.contains("\"note\""),
+            "absent note must be omitted: {json}"
+        );
+
+        item.note = Some(TaskNote {
+            id: "ffff0000".into(),
+            version: "abcdefabcdef".into(),
+            body: "2%".into(),
+            created_at: now,
+            updated_at: now,
+        });
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(json.contains("\"note\""));
+        let round: TaskItem = serde_json::from_str(&json).unwrap();
+        assert_eq!(round, item);
     }
 }
