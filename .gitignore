@@ -9,3 +9,6 @@ tmp/
 
 # Rust / Cargo build output
 /target/
+
+# Node / frontend build output
+node_modules/
