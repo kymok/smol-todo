@@ -1,11 +1,15 @@
 use crate::collections::{
-    make_collection_group_summaries, make_collection_summaries, normalized_collection,
+    add_collection_if_missing, make_collection_group_summaries, make_collection_summaries,
+    normalized_collection,
 };
 use crate::document::TaskFile;
 use crate::error::{Result, StoreError};
+use crate::ids::{is_valid_id, make_id, make_version};
 use crate::json::to_pretty_sorted;
 use crate::model::{CollectionGroupSummary, CollectionSummary, TaskItem, TaskStatus};
+use chrono::Utc;
 use fs2::FileExt;
+use std::collections::HashSet;
 use std::fs::{self, OpenOptions};
 use std::path::{Path, PathBuf};
 
@@ -161,6 +165,54 @@ impl TaskStore {
     }
 }
 
+impl TaskStore {
+    pub fn add(
+        &self,
+        title: &str,
+        collection: &str,
+        requested_id: Option<&str>,
+        allow_empty_title: bool,
+        status: TaskStatus,
+    ) -> Result<TaskItem> {
+        let clean_title = if allow_empty_title {
+            title.to_string()
+        } else {
+            title.trim().to_string()
+        };
+        let clean_collection = normalized_collection(collection)?;
+        if !allow_empty_title && clean_title.is_empty() {
+            return Err(StoreError::InvalidTitle);
+        }
+        self.with_file(true, |file| {
+            let now = Utc::now();
+            let existing: HashSet<String> = file.items.iter().map(|i| i.id.clone()).collect();
+            let id = match requested_id {
+                Some(id) => id.to_string(),
+                None => make_id(&existing),
+            };
+            if !is_valid_id(&id) {
+                return Err(StoreError::InvalidId(id));
+            }
+            if existing.contains(&id) {
+                return Err(StoreError::DuplicateId(id));
+            }
+            let mut item = TaskItem::new(
+                id,
+                clean_title.clone(),
+                clean_collection.clone(),
+                status,
+                now,
+            );
+            let existing_versions: HashSet<String> =
+                file.items.iter().map(|i| i.version.clone()).collect();
+            item.version = make_version(&existing_versions);
+            file.items.push(item.clone());
+            add_collection_if_missing(&item.collection, None, file)?;
+            Ok(item)
+        })
+    }
+}
+
 fn with_extension_suffix(path: &Path, suffix: &str) -> PathBuf {
     let mut name = path
         .file_name()
@@ -174,6 +226,7 @@ fn with_extension_suffix(path: &Path, suffix: &str) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ids::is_valid_id;
     use crate::model::TaskStatus;
     use chrono::{TimeZone, Utc};
     use tempfile::tempdir;
@@ -279,5 +332,55 @@ mod tests {
             .unwrap();
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].id, "0123abcd");
+    }
+
+    #[test]
+    fn add_trims_and_defaults_collection() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        let item = store
+            .add("  Buy milk  ", "", None, false, TaskStatus::Ready)
+            .unwrap();
+        assert_eq!(item.title, "Buy milk");
+        assert_eq!(item.collection, "Inbox");
+        assert!(is_valid_id(&item.id));
+    }
+
+    #[test]
+    fn add_rejects_empty_title_unless_allowed() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        assert_eq!(
+            store
+                .add("   ", "Inbox", None, false, TaskStatus::Ready)
+                .unwrap_err(),
+            StoreError::InvalidTitle
+        );
+        let empty = store
+            .add("", "Inbox", None, true, TaskStatus::Draft)
+            .unwrap();
+        assert_eq!(empty.title, "");
+        assert_eq!(empty.status, TaskStatus::Draft);
+    }
+
+    #[test]
+    fn add_rejects_duplicate_and_invalid_ids() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add("a", "Inbox", Some("0123abcd"), false, TaskStatus::Ready)
+            .unwrap();
+        assert_eq!(
+            store
+                .add("b", "Inbox", Some("0123abcd"), false, TaskStatus::Ready)
+                .unwrap_err(),
+            StoreError::DuplicateId("0123abcd".into())
+        );
+        assert_eq!(
+            store
+                .add("c", "Inbox", Some("xyz"), false, TaskStatus::Ready)
+                .unwrap_err(),
+            StoreError::InvalidId("xyz".into())
+        );
     }
 }
