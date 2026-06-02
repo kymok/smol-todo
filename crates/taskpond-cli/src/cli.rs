@@ -210,15 +210,57 @@ fn print_items(out: &mut dyn Write, items: &[pond_core::TaskItem]) -> Result<(),
     writeln!(out, "{json}").map_err(|e| CliError::Usage(e.to_string()))
 }
 
-#[allow(clippy::match_single_binding)]
 fn run_collection(
     cmd: CollectionCommand,
-    _store: &TaskStore,
-    _out: &mut dyn Write,
+    store: &TaskStore,
+    out: &mut dyn Write,
 ) -> Result<(), CliError> {
     match cmd {
-        _ => Ok(()), // handlers filled in Tasks 8-9
+        CollectionCommand::List => {
+            let summaries = store.collection_summaries()?;
+            print_collections(out, &summaries)
+        }
+        CollectionCommand::Create { name } => {
+            let created = store.create_collection(&unescape(&name), DEFAULT_GROUP)?;
+            print_collection_named(out, store, &created)
+        }
+        CollectionCommand::Rename { old_name, new_name } => {
+            let final_name = store.rename_collection(&unescape(&old_name), &unescape(&new_name))?;
+            print_collection_named(out, store, &final_name)
+        }
+        CollectionCommand::Color { name, color } => {
+            let color = parse_color(&color).map_err(CliError::Usage)?;
+            let summary = store.set_collection_color(&unescape(&name), color)?;
+            print_collections(out, &[summary])
+        }
+        _ => Ok(()), // delete/clear filled in Task 9
     }
+}
+
+fn print_collections(
+    out: &mut dyn Write,
+    summaries: &[pond_core::CollectionSummary],
+) -> Result<(), CliError> {
+    let outputs: Vec<CollectionOutput> = summaries
+        .iter()
+        .map(CollectionOutput::from_summary)
+        .collect();
+    let json = to_pretty_sorted(&outputs).map_err(CliError::Store)?;
+    writeln!(out, "{json}").map_err(|e| CliError::Usage(e.to_string()))
+}
+
+/// Look up a collection summary by api name and print it (matches Swift's printCollection).
+fn print_collection_named(
+    out: &mut dyn Write,
+    store: &TaskStore,
+    name: &str,
+) -> Result<(), CliError> {
+    let summary = store
+        .collection_summaries()?
+        .into_iter()
+        .find(|c| c.name == name)
+        .ok_or_else(|| CliError::Store(StoreError::CollectionNotFound(name.to_string())))?;
+    print_collections(out, &[summary])
 }
 
 #[cfg(test)]
@@ -415,5 +457,45 @@ mod tests {
             &store,
         );
         assert!(matches!(res, Err(CliError::Store(StoreError::NotFound(_)))));
+    }
+
+    #[test]
+    fn collection_create_list_rename_color() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+
+        let (res, out) = run_capture(&["taskpond", "collection", "create", "Errands"], &store);
+        assert!(res.is_ok());
+        assert!(out.contains("\"name\": \"Errands\""));
+
+        let (res, out) = run_capture(
+            &["taskpond", "collection", "color", "Errands", "blue"],
+            &store,
+        );
+        assert!(res.is_ok());
+        assert!(out.contains("\"color\": \"blue\""));
+
+        let (res, out) = run_capture(
+            &["taskpond", "collection", "rename", "Errands", "Personal"],
+            &store,
+        );
+        assert!(res.is_ok());
+        assert!(out.contains("\"name\": \"Personal\""));
+
+        let (res, out) = run_capture(&["taskpond", "collection", "list"], &store);
+        assert!(res.is_ok());
+        assert!(out.contains("Personal"));
+    }
+
+    #[test]
+    fn collection_color_rejects_bad_color() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store.create_collection("Errands", DEFAULT_GROUP).unwrap();
+        let (res, _out) = run_capture(
+            &["taskpond", "collection", "color", "Errands", "teal"],
+            &store,
+        );
+        assert!(matches!(res, Err(CliError::Usage(m)) if m.contains("Expected 'gray'")));
     }
 }
