@@ -133,9 +133,9 @@ pub fn normalized_collection_groups(
     collections: &[String],
 ) -> Vec<TaskCollectionGroup> {
     let names = normalized_collection_list(collections.to_vec());
-    let name_set: std::collections::HashSet<&String> = names.iter().collect();
-    let mut seen_groups = std::collections::HashSet::new();
-    let mut assigned = std::collections::HashSet::new();
+    let name_set: HashSet<&String> = names.iter().collect();
+    let mut seen_groups = HashSet::new();
+    let mut assigned = HashSet::new();
     let mut result: Vec<TaskCollectionGroup> = Vec::new();
 
     for group in groups {
@@ -266,6 +266,7 @@ pub fn add_collection_if_missing(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::document::{TaskCollectionGroup, TaskFile};
 
     #[test]
     fn bare_name_is_default_group() {
@@ -307,8 +308,6 @@ mod tests {
             normalized_collection_list(vec!["Inbox".into(), "Inbox".into(), "Work/A".into()]);
         assert_eq!(list, vec!["Inbox".to_string(), "Work/A".to_string()]);
     }
-
-    use crate::document::{TaskCollectionGroup, TaskFile};
 
     #[test]
     fn default_group_is_always_present_and_first() {

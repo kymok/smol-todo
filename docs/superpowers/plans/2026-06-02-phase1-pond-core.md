@@ -1436,12 +1436,22 @@ Then add to `mod tests`:
     }
 
     #[test]
-    fn move_collection_relocates_between_groups() {
-        let mut file = TaskFile::default();
-        add_collection_if_missing("A", None, &mut file).unwrap();
-        move_collection_in_file("A", "Work", &mut file);
-        // "A" is a bare default-group name; moving its api-name into Work creates a Work entry.
-        assert!(file.collection_groups.iter().any(|g| g.name == "Work" && g.collections.contains(&"A".to_string())));
+    fn group_membership_follows_api_name() {
+        // A collection listed under a group that doesn't match its API name is re-homed
+        // to the group its API name implies. "A" is a bare (default-group) API name, so
+        // even when listed under "Work" it normalizes into DefaultGroup. (Real relocation
+        // renames the API name first — see Task 20's move_collection.)
+        let groups = vec![TaskCollectionGroup {
+            name: "Work".into(),
+            collections: vec!["A".into()],
+        }];
+        let normalized = normalized_collection_groups(&groups, &["A".into()]);
+        let default = normalized.iter().find(|g| g.name == DEFAULT_GROUP).unwrap();
+        assert!(default.collections.contains(&"A".to_string()));
+        assert!(normalized
+            .iter()
+            .find(|g| g.name == "Work")
+            .map_or(true, |g| !g.collections.contains(&"A".to_string())));
     }
 ```
 
