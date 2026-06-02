@@ -62,6 +62,7 @@ impl TaskStore {
 
         let lock_file = OpenOptions::new()
             .create(true)
+            .truncate(false)
             .read(true)
             .write(true)
             .open(&self.lock_path)
@@ -155,7 +156,7 @@ impl TaskStore {
                         || i.id.contains(&q)
                         || i.note
                             .as_ref()
-                            .map_or(false, |n| n.body.to_lowercase().contains(&q))
+                            .is_some_and(|n| n.body.to_lowercase().contains(&q))
                 });
             }
             Ok(results)

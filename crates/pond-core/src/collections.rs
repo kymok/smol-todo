@@ -468,7 +468,7 @@ mod tests {
         assert!(normalized
             .iter()
             .find(|g| g.name == "Work")
-            .map_or(true, |g| !g.collections.contains(&"A".to_string())));
+            .is_none_or(|g| !g.collections.contains(&"A".to_string())));
     }
 
     fn item(id: &str, collection: &str, status: S) -> TaskItem {
