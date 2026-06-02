@@ -6,3 +6,6 @@ xcuserdata/
 *.profraw
 dist/
 tmp/
+
+# Rust / Cargo build output
+/target/
