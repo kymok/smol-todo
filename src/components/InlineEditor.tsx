@@ -12,6 +12,7 @@ import {
   updateNote,
 } from "../api/client";
 import { reduceKey, type EditorIntent, type FocusDir } from "../state/editor";
+import { autoDraftStatus } from "../state/autodraft";
 
 const AUTOSAVE_MS = 500;
 
@@ -21,6 +22,7 @@ export interface InlineEditorProps {
   /** Previous row's item, for the Backspace-merge precondition (title only). */
   previous?: TaskItem;
   editing: boolean;
+  usesAutoDraft: boolean;
   onBeginEdit: () => void;
   onEndEdit: () => void;
   onMoveFocus: (dir: FocusDir) => void;
@@ -41,6 +43,7 @@ export function InlineEditor({
   field,
   previous,
   editing,
+  usesAutoDraft,
   onBeginEdit,
   onEndEdit,
   onMoveFocus,
@@ -94,7 +97,15 @@ export function InlineEditor({
     try {
       if (field === "title") {
         if (trimmed === item.title) return; // unchanged
-        const snap = await updateItem(item.id, { title: value }, item);
+        // Edit phase = debounced autosave / blur. Auto-draft may drop the task to draft.
+        const status = autoDraftStatus({
+          usesAutoDraft,
+          currentStatus: item.status,
+          phase: "edit",
+          titleChanged: true, // we already returned above when unchanged
+        });
+        const fields = status ? { title: value, status } : { title: value };
+        const snap = await updateItem(item.id, fields, item);
         onSnapshot(snap);
       } else {
         // note
@@ -156,7 +167,28 @@ export function InlineEditor({
         break;
       }
       case "Commit": {
-        await save(draft);
+        if (field === "title") {
+          clearTimer();
+          const trimmed = draft.trim();
+          const status = autoDraftStatus({
+            usesAutoDraft,
+            currentStatus: item.status,
+            phase: "confirm",
+            titleChanged: trimmed !== item.title,
+          });
+          try {
+            // On confirm, always persist (title may be unchanged but status may still
+            // promote a draft to ready). Send status when defined, else title only.
+            const fields = status ? { title: draft, status } : { title: draft };
+            onSnapshot(await updateItem(item.id, fields, item));
+          } catch (e) {
+            console.error(e);
+          } finally {
+            onEndEdit();
+          }
+        } else {
+          await save(draft);
+        }
         if (intent.thenFocus) onMoveFocus(intent.thenFocus);
         break;
       }

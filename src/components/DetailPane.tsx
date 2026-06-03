@@ -12,6 +12,7 @@ export interface DetailPaneProps {
   view: ViewState;
   focusedId: string | null;
   editingTarget: { id: string; field: "title" | "note" } | null;
+  usesAutoDraft: boolean;
   onSearch: (q: string) => void;
   onFocusItem: (id: string | null) => void;
   onEdit: (id: string, field: "title" | "note") => void;
@@ -21,7 +22,7 @@ export interface DetailPaneProps {
 }
 
 export function DetailPane({
-  snapshot, view, focusedId, editingTarget,
+  snapshot, view, focusedId, editingTarget, usesAutoDraft,
   onSearch, onFocusItem, onEdit, onEndEdit, onSnapshot,
 }: DetailPaneProps) {
   const items = visibleItems(snapshot, view);
@@ -79,6 +80,7 @@ export function DetailPane({
               collections={snapshot.collections}
               focused={focusedId === item.id}
               editingField={editingTarget?.id === item.id ? editingTarget.field : null}
+              usesAutoDraft={usesAutoDraft}
               onFocus={() => onFocusItem(item.id)}
               onEditTitle={() => onEdit(item.id, "title")}
               onEditNote={() => onEdit(item.id, "note")}

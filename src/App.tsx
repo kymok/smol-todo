@@ -161,6 +161,7 @@ export function App() {
         view={view}
         focusedId={focusedId}
         editingTarget={editingTarget}
+        usesAutoDraft={settings.usesAutoDraft}
         onSearch={(q) => setView((v) => ({ ...v, search: q }))}
         onFocusItem={setFocusedId}
         onEdit={onEdit}

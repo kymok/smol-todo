@@ -22,6 +22,7 @@ export interface TaskRowProps {
   collections: CollectionSummary[];
   focused: boolean;
   editingField: "title" | "note" | null;
+  usesAutoDraft: boolean;
   onFocus: () => void;
   onEditTitle: () => void;
   onEditNote: () => void;
@@ -32,7 +33,7 @@ export interface TaskRowProps {
 
 export function TaskRow({
   item, previous, showCollection, collections,
-  focused, editingField, onFocus, onEditTitle, onEditNote, onEndEdit, onMoveFocus, onSnapshot,
+  focused, editingField, usesAutoDraft, onFocus, onEditTitle, onEditNote, onEndEdit, onMoveFocus, onSnapshot,
 }: TaskRowProps) {
   const advance = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -69,6 +70,7 @@ export function TaskRow({
               field="title"
               previous={previous}
               editing={editingField === "title"}
+              usesAutoDraft={usesAutoDraft}
               onBeginEdit={onEditTitle}
               onEndEdit={onEndEdit}
               onMoveFocus={onMoveFocus}
@@ -78,6 +80,7 @@ export function TaskRow({
               item={item}
               field="note"
               editing={editingField === "note"}
+              usesAutoDraft={usesAutoDraft}
               onBeginEdit={onEditNote}
               onEndEdit={onEndEdit}
               onMoveFocus={onMoveFocus}
