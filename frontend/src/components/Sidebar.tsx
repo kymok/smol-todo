@@ -3,10 +3,10 @@ import { ContextMenu } from "@base-ui-components/react/context-menu";
 import { Dialog } from "@base-ui-components/react/dialog";
 import { Menu } from "@base-ui-components/react/menu";
 import { Input } from "@base-ui-components/react/input";
-import { Circle, Settings } from "lucide-react";
+import { Circle, CircleSmall, Folder, Inbox, Settings } from "lucide-react";
 import type { CollectionColor, CollectionSummary, Snapshot } from "../api/types";
 import {
-  ALL_COLLECTION, allIncompleteCount, sidebarGroups,
+  ALL_COLLECTION, DEFAULT_COLLECTION, allIncompleteCount, sidebarGroups,
 } from "../state/view";
 import type { ConfirmRequest } from "../state/confirm";
 import {
@@ -19,6 +19,18 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { SidebarContainer } from "./PaneContainers";
 
 const COLORS: CollectionColor[] = ["gray", "red", "orange", "yellow", "green", "blue", "purple"];
+
+// Maps each collection color to a Tailwind text-color class. Full class strings
+// (not interpolated) so Tailwind's scanner picks them up.
+const COLLECTION_COLOR_CLASS: Record<CollectionColor, string> = {
+  gray: "text-gray-400",
+  red: "text-red-400",
+  orange: "text-orange-400",
+  yellow: "text-yellow-400",
+  green: "text-green-400",
+  blue: "text-blue-400",
+  purple: "text-purple-400",
+};
 
 interface PromptState {
   title: string;
@@ -171,16 +183,23 @@ export function Sidebar({
       </Dialog.Root>
 
       <SidebarContainer width={width}>
-        <button aria-current={selected === ALL_COLLECTION} onClick={() => onSelect(ALL_COLLECTION)}>
-          <span>All</span>
-          <span>{allIncompleteCount(snapshot)}</span>
+        <button
+          aria-current={selected === ALL_COLLECTION}
+          onClick={() => onSelect(ALL_COLLECTION)}
+          className="flex items-center gap-2 w-full"
+        >
+          <span className="text-gray-300 shrink-0"><CircleSmall size={16} /></span>
+          <span className="flex-1 min-w-0 font-normal text-gray-800 text-left truncate">All</span>
+          <span className="shrink-0">{allIncompleteCount(snapshot)}</span>
         </button>
 
         {sidebarGroups(snapshot, showArchived).map((group) => (
           <div key={group.name}>
             <ContextMenu.Root>
               <ContextMenu.Trigger>
-                <span>{group.name === "DefaultGroup" ? "No Group" : group.name}</span>
+                <span className="font-medium text-gray-400 text-xs">
+                  {group.name === "DefaultGroup" ? "No Group" : group.name}
+                </span>
               </ContextMenu.Trigger>
               <ContextMenu.Portal>
                 <ContextMenu.Positioner>
@@ -215,10 +234,13 @@ export function Sidebar({
                     aria-current={selected === c.name}
                     onClick={() => onSelect(c.name)}
                     style={c.isArchived ? { opacity: 0.5 } : undefined}
+                    className="flex items-center gap-2 w-full"
                   >
-                    <span style={{ color: c.color }}><Circle size={12} fill="currentColor" /></span>
-                    <span>{c.displayName}</span>
-                    <span>{c.incompleteCount}</span>
+                    <span className={`shrink-0 ${c.name === DEFAULT_COLLECTION ? "text-gray-300" : COLLECTION_COLOR_CLASS[c.color]}`}>
+                      {c.name === DEFAULT_COLLECTION ? <Inbox size={16} /> : <Folder size={16} />}
+                    </span>
+                    <span className="flex-1 min-w-0 font-normal text-gray-800 text-left truncate">{c.displayName}</span>
+                    <span className="shrink-0">{c.incompleteCount}</span>
                   </button>
                 </ContextMenu.Trigger>
                 <ContextMenu.Portal>
@@ -252,7 +274,7 @@ export function Sidebar({
                                   key={color}
                                   onClick={() => setCollectionColor(c.name, color).then(onSnapshot).catch((e) => onError(String(e)))}
                                 >
-                                  <span style={{ color }}><Circle size={12} fill="currentColor" /></span> {color}
+                                  <span className={COLLECTION_COLOR_CLASS[color]}><Circle size={12} fill="currentColor" /></span> {color}
                                 </ContextMenu.Item>
                               ))}
                             </ContextMenu.Popup>

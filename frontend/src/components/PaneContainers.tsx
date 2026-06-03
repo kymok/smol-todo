@@ -9,6 +9,11 @@ const SIDEBAR_LEFT_INSET = 14;
 // the right-edge resize handle, and applies the macOS window-chrome insets
 // (title-bar top clearance + native left inset). Children include the sidebar
 // content and the resize handle.
+//
+// Content spacing (vertical + right) lives on an inner wrapper so the spacing
+// tokens don't collide with the inline title-bar/left chrome offsets. The
+// resize handle is absolutely positioned against this outer div, so the inner
+// wrapper doesn't affect it.
 export function SidebarContainer({ width, children }: { width: number; children: ReactNode }) {
   return (
     <div
@@ -20,7 +25,7 @@ export function SidebarContainer({ width, children }: { width: number; children:
         paddingLeft: SIDEBAR_LEFT_INSET,
       }}
     >
-      {children}
+      <div className="py-2 pr-2">{children}</div>
     </div>
   );
 }

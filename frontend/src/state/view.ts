@@ -2,6 +2,9 @@ import type { CollectionGroupSummary, Snapshot, TaskItem } from "../api/types";
 
 export const ALL_COLLECTION = "__all__";
 
+// The built-in default collection (mirrors pond-core's DEFAULT_COLLECTION).
+export const DEFAULT_COLLECTION = "Inbox";
+
 export interface ViewState {
   selected: string; // ALL_COLLECTION or a collection name
   search: string;
