@@ -2,6 +2,8 @@
 
 mod commands;
 mod dto;
+#[cfg(unix)]
+mod install;
 mod mutations;
 mod prompt;
 mod settings;
@@ -44,6 +46,12 @@ fn main() {
             commands::collection_prompt_text,
             commands::collection_cli_command,
             commands::export_collection,
+            #[cfg(unix)]
+            commands::cli_install_status,
+            #[cfg(unix)]
+            commands::cli_install,
+            #[cfg(unix)]
+            commands::cli_uninstall,
         ])
         .setup(|app| {
             app.manage(pond_core::TaskStore::open_default());

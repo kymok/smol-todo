@@ -316,6 +316,51 @@ pub fn export_collection(
     Ok(())
 }
 
+#[cfg(unix)]
+fn build_installer() -> pond_core::cli_install::Installer {
+    use std::path::PathBuf;
+    let home = directories::BaseDirs::new()
+        .map(|b| b.home_dir().to_path_buf())
+        .unwrap_or_else(|| PathBuf::from("."));
+    let link = home.join(".local/bin/taskpond");
+    let target =
+        crate::install::resolve_taskpond_target().unwrap_or_else(|| PathBuf::from("taskpond"));
+    let record = pond_core::paths::data_directory().join("cli-install.json");
+    pond_core::cli_install::Installer::new(link, target, record)
+}
+
+#[cfg(unix)]
+#[tauri::command]
+pub fn cli_install_status() -> std::result::Result<crate::install::InstallStatusDto, String> {
+    let installer = build_installer();
+    Ok(crate::install::dto_from(
+        &installer.status(),
+        installer.path_hint(),
+    ))
+}
+
+#[cfg(unix)]
+#[tauri::command]
+pub fn cli_install() -> std::result::Result<crate::install::InstallStatusDto, String> {
+    let installer = build_installer();
+    installer.install().map_err(|e| e.to_string())?;
+    Ok(crate::install::dto_from(
+        &installer.status(),
+        installer.path_hint(),
+    ))
+}
+
+#[cfg(unix)]
+#[tauri::command]
+pub fn cli_uninstall() -> std::result::Result<crate::install::InstallStatusDto, String> {
+    let installer = build_installer();
+    installer.uninstall().map_err(|e| e.to_string())?;
+    Ok(crate::install::dto_from(
+        &installer.status(),
+        installer.path_hint(),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
