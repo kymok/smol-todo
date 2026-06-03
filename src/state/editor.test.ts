@@ -131,4 +131,19 @@ describe("editor reducer — note field", () => {
     expect(reduceKey(ctx({ field: "note", key: "Enter", value: "ん", composing: true })))
       .toEqual({ type: "None" });
   });
+
+  it("Shift+Enter lets textarea insert a newline (does not commit)", () => {
+    expect(reduceKey(ctx({ field: "note", key: "Enter", shiftKey: true, value: "n" })))
+      .toEqual({ type: "None" });
+  });
+
+  it("Cmd+Enter lets textarea insert a newline (does not commit)", () => {
+    expect(reduceKey(ctx({ field: "note", key: "Enter", metaKey: true, value: "n" })))
+      .toEqual({ type: "None" });
+  });
+
+  it("plain Enter (non-empty) still commits and moves focus down", () => {
+    expect(reduceKey(ctx({ field: "note", key: "Enter", value: "n" })))
+      .toEqual({ type: "Commit", thenFocus: "down" });
+  });
 });

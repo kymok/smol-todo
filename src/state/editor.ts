@@ -72,10 +72,18 @@ function reduceNote(c: KeyContext): EditorIntent {
   switch (c.key) {
     case "Escape":
       return { type: "Discard" };
-    case "Enter":
+    case "Enter": {
+      if (c.composing) return { type: "None" }; // IME — do not commit/move
+      // Modified Enter (Shift/Alt/Ctrl/Cmd+Enter) → let the textarea insert a newline.
+      if (c.shiftKey || c.altKey || c.ctrlKey || c.metaKey) return { type: "None" };
+      // Plain Enter → commit and move focus down; empty note → delete.
+      return isEmpty(c.value)
+        ? { type: "DeleteEmpty", thenFocus: "down" }
+        : { type: "Commit", thenFocus: "down" };
+    }
     case "Tab": {
       if (c.composing) return { type: "None" }; // IME — do not commit/move
-      // Swift handleNoteKeyDown: Return/Tab move focus down; empty note removes it.
+      // Swift handleNoteKeyDown: Tab moves focus down; empty note removes it.
       return isEmpty(c.value)
         ? { type: "DeleteEmpty", thenFocus: "down" }
         : { type: "Commit", thenFocus: "down" };
