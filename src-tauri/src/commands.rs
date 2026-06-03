@@ -1,6 +1,8 @@
 use crate::dto::{CollectionGroupSummaryDto, CollectionSummaryDto, SnapshotDto};
 use crate::mutations;
+use crate::settings::{self, Settings};
 use pond_core::{CollectionColor, Result, TaskItem, TaskStatus, TaskStore};
+use std::sync::Mutex;
 use tauri::State;
 
 /// Build the full read-only snapshot from a store. Testable (no Tauri types).
@@ -229,6 +231,28 @@ pub fn delete_group(
     name: String,
 ) -> std::result::Result<SnapshotDto, String> {
     mutations::delete_group(&store, &name).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_settings(state: State<Mutex<Settings>>) -> std::result::Result<Settings, String> {
+    let guard = state.lock().map_err(|e| e.to_string())?;
+    Ok(guard.clone())
+}
+
+#[tauri::command]
+pub fn set_settings(
+    state: State<Mutex<Settings>>,
+    settings: Settings,
+) -> std::result::Result<Settings, String> {
+    settings::save(&settings::settings_path(), &settings).map_err(|e| e.to_string())?;
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    *guard = settings.clone();
+    Ok(settings)
+}
+
+#[tauri::command]
+pub fn store_path(store: State<TaskStore>) -> String {
+    store.file_path().display().to_string()
 }
 
 #[cfg(test)]

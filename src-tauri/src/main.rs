@@ -3,6 +3,7 @@
 mod commands;
 mod dto;
 mod mutations;
+mod settings;
 mod watcher;
 
 use std::time::Duration;
@@ -33,9 +34,14 @@ fn main() {
             commands::create_group,
             commands::rename_group,
             commands::delete_group,
+            commands::get_settings,
+            commands::set_settings,
+            commands::store_path,
         ])
         .setup(|app| {
             app.manage(pond_core::TaskStore::open_default());
+            let loaded_settings = settings::load(&settings::settings_path());
+            app.manage(std::sync::Mutex::new(loaded_settings));
 
             let store_dir = pond_core::paths::default_store_path()
                 .parent()
