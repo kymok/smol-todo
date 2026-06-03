@@ -2471,6 +2471,7 @@ dependencies = [
 name = "pond-tauri"
 version = "0.1.0"
 dependencies = [
+ "directories",
  "notify",
  "pond-core",
  "serde",
