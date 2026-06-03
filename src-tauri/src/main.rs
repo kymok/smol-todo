@@ -46,6 +46,7 @@ fn main() {
             commands::collection_prompt_text,
             commands::collection_cli_command,
             commands::export_collection,
+            commands::set_statuses,
             #[cfg(unix)]
             commands::cli_install_status,
             #[cfg(unix)]

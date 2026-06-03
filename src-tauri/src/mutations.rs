@@ -5,6 +5,7 @@ use pond_core::export::{ExportFormat, ExportPayload};
 use pond_core::{
     CollectionColor, Result, TaskItem, TaskStatus, TaskStore, DEFAULT_COLLECTION, DEFAULT_GROUP,
 };
+use std::collections::HashMap;
 
 /// Create a new empty Draft (title typed in the editor). `collection` is the
 /// target collection api-name; `None`/empty falls back to the default collection.
@@ -200,6 +201,18 @@ pub fn set_collection_prompt(
     build_snapshot(store)
 }
 
+/// Remap statuses within a single collection: every item whose current status is a key
+/// in `replacements` is set to the mapped value (no-op pairs are ignored by pond-core).
+/// `ids` empty + `Some(collection)` scopes it to the whole collection. Returns the snapshot.
+pub fn set_statuses(
+    store: &TaskStore,
+    replacements: &HashMap<TaskStatus, TaskStatus>,
+    collection: &str,
+) -> Result<SnapshotDto> {
+    store.set_statuses(replacements, &[], Some(collection))?;
+    build_snapshot(store)
+}
+
 /// Encode a collection's items as JSON or JSONL via pond-core's `ExportPayload`.
 /// The timestamp is `Utc::now()`, so callers/tests must treat the output's time
 /// as non-deterministic.
@@ -217,6 +230,7 @@ mod tests {
     use super::*;
     use pond_core::export::ExportFormat;
     use pond_core::{CollectionColor, TaskStatus, DEFAULT_GROUP};
+    use std::collections::HashMap;
     use tempfile::tempdir;
 
     fn store() -> (tempfile::TempDir, TaskStore) {
@@ -556,5 +570,71 @@ mod tests {
         let json = export_text(&store, "Empty", ExportFormat::Json).unwrap();
         assert!(json.contains("\"items\""));
         assert!(json.contains("\"Empty\""));
+    }
+
+    #[test]
+    fn set_statuses_remaps_within_collection() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add("A", "Work", None, false, TaskStatus::Ready)
+            .unwrap();
+        store
+            .add("B", "Work", None, false, TaskStatus::Ready)
+            .unwrap();
+        store
+            .add("C", "Work", None, false, TaskStatus::InProgress)
+            .unwrap();
+        // A different collection that must be untouched.
+        store
+            .add("X", "Home", None, false, TaskStatus::Ready)
+            .unwrap();
+
+        let mut replacements = HashMap::new();
+        replacements.insert(TaskStatus::Ready, TaskStatus::Completed);
+        let snap = set_statuses(&store, &replacements, "Work").unwrap();
+
+        // Work: the two Ready items are now Completed; the InProgress is unchanged.
+        let work: Vec<&TaskItem> = snap
+            .items
+            .iter()
+            .filter(|i| i.collection == "Work")
+            .collect();
+        assert_eq!(
+            work.iter()
+                .filter(|i| i.status == TaskStatus::Completed)
+                .count(),
+            2
+        );
+        assert_eq!(
+            work.iter()
+                .filter(|i| i.status == TaskStatus::InProgress)
+                .count(),
+            1
+        );
+        assert_eq!(
+            work.iter()
+                .filter(|i| i.status == TaskStatus::Ready)
+                .count(),
+            0
+        );
+
+        // Home is untouched (still Ready).
+        let home: Vec<&TaskItem> = snap
+            .items
+            .iter()
+            .filter(|i| i.collection == "Home")
+            .collect();
+        assert_eq!(home.len(), 1);
+        assert_eq!(home[0].status, TaskStatus::Ready);
+    }
+
+    #[test]
+    fn replacements_map_deserializes_from_json_object() {
+        // The wire shape is a JS object of status-string -> status-string.
+        let map: HashMap<TaskStatus, TaskStatus> =
+            serde_json::from_str(r#"{"ready":"completed","in-progress":"on-hold"}"#).unwrap();
+        assert_eq!(map.get(&TaskStatus::Ready), Some(&TaskStatus::Completed));
+        assert_eq!(map.get(&TaskStatus::InProgress), Some(&TaskStatus::OnHold));
     }
 }

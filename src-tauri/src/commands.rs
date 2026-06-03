@@ -297,6 +297,15 @@ pub fn collection_cli_command(name: String) -> String {
 }
 
 #[tauri::command]
+pub fn set_statuses(
+    store: State<TaskStore>,
+    replacements: HashMap<TaskStatus, TaskStatus>,
+    collection: String,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::set_statuses(&store, &replacements, &collection).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn export_collection(
     store: State<TaskStore>,
     name: String,
