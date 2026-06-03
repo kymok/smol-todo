@@ -8,7 +8,7 @@ import { TITLE_BAR_HEIGHT } from "../layout";
 export function SidebarContainer({ width, children }: { width: number; children: ReactNode }) {
   return (
     <div style={{ width, position: "relative", flexShrink: 0, paddingTop: TITLE_BAR_HEIGHT }}>
-      <div className="px-4 py-0">{children}</div>
+      <div className="flex flex-col px-2 py-0 select-none">{children}</div>
     </div>
   );
 }
