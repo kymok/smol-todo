@@ -116,6 +116,34 @@ pub fn delete_note(
     mutations::delete_note(&store, &id, if_current).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn merge_item(
+    store: State<TaskStore>,
+    id: String,
+    into_previous: String,
+    title: String,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::merge_item(&store, &id, &into_previous, &title).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn split_item(
+    store: State<TaskStore>,
+    id: String,
+    first_title: String,
+    second_title: String,
+    second_id: Option<String>,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::split_item(
+        &store,
+        &id,
+        &first_title,
+        &second_title,
+        second_id.as_deref(),
+    )
+    .map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

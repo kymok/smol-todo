@@ -21,6 +21,8 @@ fn main() {
             commands::add_note,
             commands::update_note,
             commands::delete_note,
+            commands::merge_item,
+            commands::split_item,
         ])
         .setup(|app| {
             app.manage(pond_core::TaskStore::open_default());

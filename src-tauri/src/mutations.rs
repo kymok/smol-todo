@@ -101,6 +101,27 @@ pub fn delete_note(
     build_snapshot(store)
 }
 
+pub fn merge_item(
+    store: &TaskStore,
+    id: &str,
+    into_previous: &str,
+    title: &str,
+) -> Result<SnapshotDto> {
+    store.merge_item(id, into_previous, title)?;
+    build_snapshot(store)
+}
+
+pub fn split_item(
+    store: &TaskStore,
+    id: &str,
+    first_title: &str,
+    second_title: &str,
+    second_id: Option<&str>,
+) -> Result<SnapshotDto> {
+    store.split_item(id, first_title, second_title, second_id)?;
+    build_snapshot(store)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -248,6 +269,35 @@ mod tests {
         // `item` stale → guarded add is a no-op, note stays absent.
         let snap = add_note(&store, &item.id, "ignored", Some(item.clone())).unwrap();
         assert!(snap.items[0].note.is_none());
+    }
+
+    #[test]
+    fn merge_item_appends_into_previous_and_removes_source() {
+        let (_dir, store) = store();
+        let prev = store
+            .add("Hello", "Inbox", None, false, TaskStatus::Ready)
+            .unwrap();
+        let src = store
+            .add("World", "Inbox", None, false, TaskStatus::Ready)
+            .unwrap();
+        // merge_item appends `title` directly to prev's title via push_str.
+        let snap = merge_item(&store, &src.id, &prev.id, " World").unwrap();
+        assert_eq!(snap.items.len(), 1);
+        assert_eq!(snap.items[0].id, prev.id);
+        assert_eq!(snap.items[0].title, "Hello World");
+    }
+
+    #[test]
+    fn split_item_creates_a_second_task() {
+        let (_dir, store) = store();
+        let item = store
+            .add("alpha beta", "Inbox", None, false, TaskStatus::Ready)
+            .unwrap();
+        let snap = split_item(&store, &item.id, "alpha", "beta", None).unwrap();
+        assert_eq!(snap.items.len(), 2);
+        let titles: Vec<&str> = snap.items.iter().map(|i| i.title.as_str()).collect();
+        assert!(titles.contains(&"alpha"));
+        assert!(titles.contains(&"beta"));
     }
 
     #[test]
