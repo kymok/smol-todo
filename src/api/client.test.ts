@@ -1,11 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import type { TaskItem } from "./types";
 
 const invokeMock = vi.fn();
 const listenMock = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...a: unknown[]) => invokeMock(...a) }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: (...a: unknown[]) => listenMock(...a) }));
 
-import { getSnapshot, onStoreChanged } from "./client";
+import { getSnapshot, onStoreChanged, createItem, setStatus } from "./client";
 
 describe("api client", () => {
   beforeEach(() => { invokeMock.mockReset(); listenMock.mockReset(); });
@@ -23,5 +24,22 @@ describe("api client", () => {
     const cb = vi.fn();
     await onStoreChanged(cb);
     expect(listenMock).toHaveBeenCalledWith("store-changed", expect.any(Function));
+  });
+
+  it("createItem invokes create_item with the collection arg", async () => {
+    invokeMock.mockResolvedValue({ items: [], collections: [], groups: [] });
+    await createItem("Work/Docs");
+    expect(invokeMock).toHaveBeenCalledWith("create_item", { collection: "Work/Docs" });
+  });
+
+  it("setStatus invokes set_status with id/status/ifCurrent", async () => {
+    invokeMock.mockResolvedValue({ items: [], collections: [], groups: [] });
+    const item = { id: "00000001" } as unknown as TaskItem;
+    await setStatus("completed", "00000001", item);
+    expect(invokeMock).toHaveBeenCalledWith("set_status", {
+      status: "completed",
+      id: "00000001",
+      ifCurrent: item,
+    });
   });
 });

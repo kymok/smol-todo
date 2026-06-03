@@ -15,3 +15,5 @@ export interface CollectionSummary {
 }
 export interface CollectionGroupSummary { name: string; collections: CollectionSummary[]; }
 export interface Snapshot { items: TaskItem[]; collections: CollectionSummary[]; groups: CollectionGroupSummary[]; }
+
+export type CollectionColorName = CollectionColor;
