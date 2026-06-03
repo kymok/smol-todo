@@ -103,13 +103,3 @@ frontend/             the React + Radix Themes frontend (Vite)
 
 Tests: `cargo test` (Rust workspace) and `(cd frontend && npm test)` (frontend logic, Vitest).
 Run the CLI directly with `cargo run -p taskpond-cli -- item get`. The store path honors `POND_STORE`.
-
-## Legacy SwiftUI app
-
-The original SwiftUI implementation remains under `Sources/` as the behavioral reference for
-the Tauri port. To build it:
-
-```sh
-xcodebuild -project Pond.xcodeproj -scheme Pond -configuration Debug build
-./Scripts/package-app.sh   # package a macOS .app bundle to dist/Pond.app
-```
