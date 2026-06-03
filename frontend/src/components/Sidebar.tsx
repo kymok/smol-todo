@@ -39,8 +39,13 @@ const COLLECTION_COLOR_CLASS: Record<CollectionColor, string> = {
 // so the content lines up with the detail pane while the active background
 // extends toward the edge. Groups/View can't become active yet but share this for
 // future use. Vertical padding is per-row (groups py-1, everything else py-2).
-const SIDEBAR_ROW_CLASS =
-  "w-full px-2 rounded-lg hover:bg-neutral-50 aria-[current=true]:bg-sky-100 aria-[current=true]:text-sky-600";
+//
+// SIDEBAR_ROW_BASE omits the hover and active-background styles so group headers
+// can show hover/active via text color only; the other rows add the background
+// hover and active background on top.
+const SIDEBAR_ROW_BASE =
+  "w-full px-2 rounded-lg aria-[current=true]:text-sky-600";
+const SIDEBAR_ROW_CLASS = `${SIDEBAR_ROW_BASE} hover:bg-neutral-50 aria-[current=true]:bg-sky-100`;
 
 interface PromptState {
   title: string;
@@ -88,6 +93,7 @@ export function Sidebar({
 }: SidebarProps) {
   const groupNames = snapshot.groups.map((g) => g.name);
   const visibleGroups = sidebarGroups(snapshot, showArchived);
+  const allCount = allIncompleteCount(snapshot);
 
   // Accordion open/close is tracked as the set of *closed* groups so newly added
   // groups default to open. The accordion's controlled value is the open ones.
@@ -207,11 +213,11 @@ export function Sidebar({
         <button
           aria-current={selected === ALL_COLLECTION}
           onClick={() => onSelect(ALL_COLLECTION)}
-          className={`flex items-center gap-2 py-2 -mt-2 text-sm text-neutral-800 ${SIDEBAR_ROW_CLASS}`}
+          className={`group flex items-center gap-2 py-2 -mt-2 text-sm text-neutral-800 ${SIDEBAR_ROW_CLASS}`}
         >
-          <span className="text-neutral-600 shrink-0"><CircleSmall size={16} /></span>
+          <span className="text-neutral-600 shrink-0 group-aria-[current=true]:text-sky-600"><CircleSmall size={16} /></span>
           <span className="flex-1 min-w-0 font-normal text-left truncate">All</span>
-          <span className="shrink-0">{allIncompleteCount(snapshot)}</span>
+          {allCount > 0 && <span className="shrink-0 text-xs text-neutral-500 group-aria-[current=true]:text-sky-500">{allCount}</span>}
         </button>
 
         {/* Keep mt-* (gap above the first group, i.e. between All and the groups)
@@ -223,11 +229,11 @@ export function Sidebar({
           onValueChange={handleGroupOpenChange}
         >
         {visibleGroups.map((group) => {
+          const isOpen = !closedGroups.includes(group.name);
           // A collapsed group whose collection is currently selected shows the
           // active color, since the selected row is hidden inside it.
           const headerActive =
-            closedGroups.includes(group.name) &&
-            group.collections.some((c) => c.name === selected);
+            !isOpen && group.collections.some((c) => c.name === selected);
           return (
           <Accordion.Item key={group.name} value={group.name} className="flex flex-col">
             <Accordion.Header>
@@ -235,7 +241,7 @@ export function Sidebar({
               <ContextMenu.Trigger>
                 <Accordion.Trigger
                   aria-current={headerActive}
-                  className={`w-full py-1 text-left font-medium text-neutral-400 text-xs ${SIDEBAR_ROW_CLASS}`}
+                  className={`${SIDEBAR_ROW_BASE} hover:text-neutral-500 py-1 text-left font-medium text-neutral-400 text-xs`}
                 >
                   {group.name === "DefaultGroup" ? "No Group" : group.name}
                 </Accordion.Trigger>
@@ -282,15 +288,15 @@ export function Sidebar({
                     aria-current={selected === c.name}
                     onClick={() => onSelect(c.name)}
                     style={c.isArchived ? { opacity: 0.5 } : undefined}
-                    className={`flex items-center gap-2 py-2 text-sm text-neutral-800 ${SIDEBAR_ROW_CLASS}`}
+                    className={`group flex items-center gap-2 py-2 text-sm text-neutral-800 ${SIDEBAR_ROW_CLASS}`}
                   >
-                    <span className={`shrink-0 ${c.name === DEFAULT_COLLECTION ? "text-neutral-600" : COLLECTION_COLOR_CLASS[c.color]}`}>
+                    <span className={`shrink-0 ${c.name === DEFAULT_COLLECTION ? "text-neutral-600 group-aria-[current=true]:text-sky-600" : COLLECTION_COLOR_CLASS[c.color]}`}>
                       {c.isArchived ? <Archive size={16} />
                         : c.name === DEFAULT_COLLECTION ? <Inbox size={16} />
                         : <FilledCircle size={16} />}
                     </span>
                     <span className="flex-1 min-w-0 font-normal text-left truncate">{c.displayName}</span>
-                    <span className="shrink-0">{c.incompleteCount}</span>
+                    {c.incompleteCount > 0 && <span className="shrink-0 text-xs text-neutral-500 group-aria-[current=true]:text-sky-500">{c.incompleteCount}</span>}
                   </button>
                 </ContextMenu.Trigger>
                 <ContextMenu.Portal>
