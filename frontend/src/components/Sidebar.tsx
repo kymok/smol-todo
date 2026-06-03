@@ -273,7 +273,7 @@ export function Sidebar({
             </ContextMenu.Root>
             </Accordion.Header>
 
-            <Accordion.Panel className="flex flex-col">
+            <Accordion.Panel className="flex flex-col overflow-hidden h-[var(--accordion-panel-height)] transition-[height] duration-200 ease-out data-[starting-style]:h-0 data-[ending-style]:h-0">
             {group.collections.length === 0 ? (
               // Empty-group placeholder: no icon, but a spacer matching the icon
               // width keeps the text aligned with the other rows' labels.
