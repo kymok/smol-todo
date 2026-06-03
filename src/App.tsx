@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertDialog, Button, Flex } from "@radix-ui/themes";
-import type { Snapshot } from "./api/types";
+import type { Settings, Snapshot } from "./api/types";
 import {
   createItem,
   deleteItem,
+  getSettings,
   getSnapshot,
   onStoreChanged,
+  setSettings,
 } from "./api/client";
 import { ALL_COLLECTION, type ViewState } from "./state/view";
 import type { ConfirmRequest } from "./state/confirm";
@@ -13,6 +15,13 @@ import { Sidebar } from "./components/Sidebar";
 import { DetailPane } from "./components/DetailPane";
 
 const EMPTY: Snapshot = { items: [], collections: [], groups: [] };
+
+const DEFAULT_SETTINGS: Settings = {
+  usesAutoDraft: true,
+  alwaysOnTop: false,
+  defaultPromptTemplate: "",
+  lastSelectedCollection: null,
+};
 
 export function App() {
   const [snapshot, setSnapshot] = useState<Snapshot>(EMPTY);
@@ -26,6 +35,9 @@ export function App() {
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [editingTarget, setEditingTarget] = useState<{ id: string; field: "title" | "note" } | null>(null);
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
+  const [settings, setSettingsState] = useState<Settings>(DEFAULT_SETTINGS);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
 
   // Always-current snapshot for keyboard handlers.
   const snapRef = useRef(snapshot);
@@ -57,6 +69,38 @@ export function App() {
   // and pass the resolved snapshot here.
   const apply = useCallback((next: Snapshot) => setSnapshot(next), []);
   const requestConfirm = useCallback((req: ConfirmRequest) => setConfirm(req), []);
+
+  // Merge a partial change into settings, persist the whole object, and update state
+  // from the persisted result.
+  const updateSettings = useCallback((patch: Partial<Settings>) => {
+    const next = { ...settingsRef.current, ...patch };
+    setSettingsState(next); // optimistic
+    setSettings(next)
+      .then(setSettingsState)
+      .catch((e) => console.error(e));
+  }, []);
+
+  // Fetch settings on mount; restore lastSelectedCollection if it still exists.
+  useEffect(() => {
+    getSettings()
+      .then((s) => {
+        setSettingsState(s);
+        const last = s.lastSelectedCollection;
+        if (last) {
+          const exists = snapRef.current.collections.some((c) => c.name === last);
+          if (exists) setView((v) => ({ ...v, selected: last }));
+        }
+      })
+      .catch((e) => console.error(e));
+  }, []);
+
+  // Persist the selected collection so it can be restored next launch.
+  useEffect(() => {
+    const sel = view.selected === ALL_COLLECTION ? null : view.selected;
+    if (sel !== settingsRef.current.lastSelectedCollection) {
+      updateSettings({ lastSelectedCollection: sel });
+    }
+  }, [view.selected, updateSettings]);
 
   const onEdit = useCallback((id: string, field: "title" | "note") => {
     setEditingTarget({ id, field });

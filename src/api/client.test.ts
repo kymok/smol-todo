@@ -6,7 +6,7 @@ const listenMock = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...a: unknown[]) => invokeMock(...a) }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: (...a: unknown[]) => listenMock(...a) }));
 
-import { getSnapshot, onStoreChanged, createItem, setStatus } from "./client";
+import { getSnapshot, onStoreChanged, createItem, setStatus, getSettings, setSettings } from "./client";
 
 describe("api client", () => {
   beforeEach(() => { invokeMock.mockReset(); listenMock.mockReset(); });
@@ -41,5 +41,29 @@ describe("api client", () => {
       id: "00000001",
       ifCurrent: item,
     });
+  });
+
+  it("getSettings invokes get_settings with no args", async () => {
+    const settings = {
+      usesAutoDraft: true,
+      alwaysOnTop: false,
+      defaultPromptTemplate: "",
+      lastSelectedCollection: null,
+    };
+    invokeMock.mockResolvedValue(settings);
+    await expect(getSettings()).resolves.toEqual(settings);
+    expect(invokeMock).toHaveBeenCalledWith("get_settings");
+  });
+
+  it("setSettings invokes set_settings with the whole settings object", async () => {
+    const settings = {
+      usesAutoDraft: false,
+      alwaysOnTop: true,
+      defaultPromptTemplate: "",
+      lastSelectedCollection: "Work/Docs",
+    };
+    invokeMock.mockResolvedValue(settings);
+    await setSettings(settings);
+    expect(invokeMock).toHaveBeenCalledWith("set_settings", { settings });
   });
 });

@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { CollectionColor, Snapshot, TaskItem, TaskStatus } from "./types";
+import type { CollectionColor, Settings, Snapshot, TaskItem, TaskStatus } from "./types";
 
 export function getSnapshot(): Promise<Snapshot> {
   return invoke<Snapshot>("get_snapshot");
@@ -112,4 +112,17 @@ export function renameGroup(oldName: string, newName: string): Promise<Snapshot>
 
 export function deleteGroup(name: string): Promise<Snapshot> {
   return invoke<Snapshot>("delete_group", { name });
+}
+
+// --- Settings ---
+export function getSettings(): Promise<Settings> {
+  return invoke<Settings>("get_settings");
+}
+
+export function setSettings(settings: Settings): Promise<Settings> {
+  return invoke<Settings>("set_settings", { settings });
+}
+
+export function storePath(): Promise<string> {
+  return invoke<string>("store_path");
 }

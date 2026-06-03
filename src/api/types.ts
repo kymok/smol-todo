@@ -17,3 +17,10 @@ export interface CollectionGroupSummary { name: string; collections: CollectionS
 export interface Snapshot { items: TaskItem[]; collections: CollectionSummary[]; groups: CollectionGroupSummary[]; }
 
 export type CollectionColorName = CollectionColor;
+
+export interface Settings {
+  usesAutoDraft: boolean;
+  alwaysOnTop: boolean;
+  defaultPromptTemplate: string;
+  lastSelectedCollection: string | null;
+}
