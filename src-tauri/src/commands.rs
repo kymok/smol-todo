@@ -1,5 +1,7 @@
 use crate::dto::{CollectionGroupSummaryDto, CollectionSummaryDto, SnapshotDto};
+use crate::mutations;
 use pond_core::{Result, TaskStore};
+use tauri::State;
 
 /// Build the full read-only snapshot from a store. Testable (no Tauri types).
 pub fn build_snapshot(store: &TaskStore) -> Result<SnapshotDto> {
@@ -19,8 +21,16 @@ pub fn build_snapshot(store: &TaskStore) -> Result<SnapshotDto> {
 }
 
 #[tauri::command]
-pub fn get_snapshot() -> std::result::Result<SnapshotDto, String> {
-    build_snapshot(&TaskStore::open_default()).map_err(|e| e.to_string())
+pub fn get_snapshot(store: State<TaskStore>) -> std::result::Result<SnapshotDto, String> {
+    build_snapshot(&store).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn create_item(
+    store: State<TaskStore>,
+    collection: Option<String>,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::create_item(&store, collection.as_deref()).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

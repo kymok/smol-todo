@@ -2,6 +2,7 @@
 
 mod commands;
 mod dto;
+mod mutations;
 mod watcher;
 
 use std::time::Duration;
@@ -9,8 +10,13 @@ use tauri::{Emitter, Manager};
 
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![commands::get_snapshot])
+        .invoke_handler(tauri::generate_handler![
+            commands::get_snapshot,
+            commands::create_item,
+        ])
         .setup(|app| {
+            app.manage(pond_core::TaskStore::open_default());
+
             let store_dir = pond_core::paths::default_store_path()
                 .parent()
                 .map(|p| p.to_path_buf());
