@@ -23,6 +23,13 @@ fn main() {
             commands::delete_note,
             commands::merge_item,
             commands::split_item,
+            commands::create_collection,
+            commands::rename_collection,
+            commands::set_collection_color,
+            commands::set_collection_archived,
+            commands::move_collection,
+            commands::clear_items,
+            commands::delete_collection,
         ])
         .setup(|app| {
             app.manage(pond_core::TaskStore::open_default());

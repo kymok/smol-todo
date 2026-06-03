@@ -1,6 +1,6 @@
 use crate::dto::{CollectionGroupSummaryDto, CollectionSummaryDto, SnapshotDto};
 use crate::mutations;
-use pond_core::{Result, TaskItem, TaskStatus, TaskStore};
+use pond_core::{CollectionColor, Result, TaskItem, TaskStatus, TaskStore};
 use tauri::State;
 
 /// Build the full read-only snapshot from a store. Testable (no Tauri types).
@@ -142,6 +142,68 @@ pub fn split_item(
         second_id.as_deref(),
     )
     .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn create_collection(
+    store: State<TaskStore>,
+    name: String,
+    group: Option<String>,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::create_collection(&store, &name, group.as_deref()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn rename_collection(
+    store: State<TaskStore>,
+    old: String,
+    new: String,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::rename_collection(&store, &old, &new).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_collection_color(
+    store: State<TaskStore>,
+    name: String,
+    color: CollectionColor,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::set_collection_color(&store, &name, color).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_collection_archived(
+    store: State<TaskStore>,
+    name: String,
+    is_archived: bool,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::set_collection_archived(&store, &name, is_archived).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn move_collection(
+    store: State<TaskStore>,
+    name: String,
+    group: String,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::move_collection(&store, &name, &group).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn clear_items(
+    store: State<TaskStore>,
+    name: String,
+    completed_only: bool,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::clear_items(&store, &name, completed_only).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_collection(
+    store: State<TaskStore>,
+    name: String,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::delete_collection(&store, &name).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

@@ -1,6 +1,8 @@
 use crate::commands::build_snapshot;
 use crate::dto::SnapshotDto;
-use pond_core::{Result, TaskItem, TaskStatus, TaskStore, DEFAULT_COLLECTION};
+use pond_core::{
+    CollectionColor, Result, TaskItem, TaskStatus, TaskStore, DEFAULT_COLLECTION, DEFAULT_GROUP,
+};
 
 /// Create a new empty Draft (title typed in the editor). `collection` is the
 /// target collection api-name; `None`/empty falls back to the default collection.
@@ -122,9 +124,58 @@ pub fn split_item(
     build_snapshot(store)
 }
 
+pub fn create_collection(
+    store: &TaskStore,
+    name: &str,
+    group: Option<&str>,
+) -> Result<SnapshotDto> {
+    let group = group.filter(|g| !g.is_empty()).unwrap_or(DEFAULT_GROUP);
+    store.create_collection(name, group)?;
+    build_snapshot(store)
+}
+
+pub fn rename_collection(store: &TaskStore, old: &str, new: &str) -> Result<SnapshotDto> {
+    store.rename_collection(old, new)?;
+    build_snapshot(store)
+}
+
+pub fn set_collection_color(
+    store: &TaskStore,
+    name: &str,
+    color: CollectionColor,
+) -> Result<SnapshotDto> {
+    store.set_collection_color(name, color)?;
+    build_snapshot(store)
+}
+
+pub fn set_collection_archived(
+    store: &TaskStore,
+    name: &str,
+    is_archived: bool,
+) -> Result<SnapshotDto> {
+    store.set_collection_archived(name, is_archived)?;
+    build_snapshot(store)
+}
+
+pub fn move_collection(store: &TaskStore, name: &str, group: &str) -> Result<SnapshotDto> {
+    store.move_collection(name, group)?;
+    build_snapshot(store)
+}
+
+pub fn clear_items(store: &TaskStore, name: &str, completed_only: bool) -> Result<SnapshotDto> {
+    store.clear_items(name, completed_only)?;
+    build_snapshot(store)
+}
+
+pub fn delete_collection(store: &TaskStore, name: &str) -> Result<SnapshotDto> {
+    store.delete_collection(name)?;
+    build_snapshot(store)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pond_core::{CollectionColor, DEFAULT_GROUP};
     use tempfile::tempdir;
 
     fn store() -> (tempfile::TempDir, TaskStore) {
@@ -313,5 +364,60 @@ mod tests {
         // Guarded delete with the stale item must be a no-op; note stays present.
         let snap = delete_note(&store, &item.id, Some(item.clone())).unwrap();
         assert!(snap.items[0].note.is_some());
+    }
+
+    #[test]
+    fn collection_lifecycle() {
+        let (_dir, store) = store();
+        // create
+        let snap = create_collection(&store, "Errands", None).unwrap();
+        assert!(snap.collections.iter().any(|c| c.name == "Errands"));
+        // color
+        let snap = set_collection_color(&store, "Errands", CollectionColor::Blue).unwrap();
+        assert_eq!(
+            snap.collections
+                .iter()
+                .find(|c| c.name == "Errands")
+                .unwrap()
+                .color,
+            CollectionColor::Blue
+        );
+        // archive
+        let snap = set_collection_archived(&store, "Errands", true).unwrap();
+        assert!(
+            snap.collections
+                .iter()
+                .find(|c| c.name == "Errands")
+                .unwrap()
+                .is_archived
+        );
+        // rename
+        let snap = rename_collection(&store, "Errands", "Tasks").unwrap();
+        assert!(snap.collections.iter().any(|c| c.name == "Tasks"));
+        assert!(!snap.collections.iter().any(|c| c.name == "Errands"));
+        // move to a group (api-name becomes "Work/Tasks")
+        let snap = move_collection(&store, "Tasks", "Work").unwrap();
+        assert!(snap.collections.iter().any(|c| c.name == "Work/Tasks"));
+        // delete
+        let snap = delete_collection(&store, "Work/Tasks").unwrap();
+        assert!(!snap.collections.iter().any(|c| c.name == "Work/Tasks"));
+    }
+
+    #[test]
+    fn clear_items_removes_completed_only() {
+        let (_dir, store) = store();
+        store.create_collection("Box", DEFAULT_GROUP).unwrap();
+        store
+            .add("keep", "Box", None, false, TaskStatus::Ready)
+            .unwrap();
+        store
+            .add("drop", "Box", None, false, TaskStatus::Completed)
+            .unwrap();
+        let snap = clear_items(&store, "Box", true).unwrap();
+        assert_eq!(
+            snap.items.iter().filter(|i| i.collection == "Box").count(),
+            1
+        );
+        assert_eq!(snap.items[0].title, "keep");
     }
 }
