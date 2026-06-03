@@ -25,13 +25,13 @@ const COLORS: CollectionColor[] = ["gray", "red", "orange", "yellow", "green", "
 // Maps each collection color to a Tailwind text-color class. Full class strings
 // (not interpolated) so Tailwind's scanner picks them up.
 const COLLECTION_COLOR_CLASS: Record<CollectionColor, string> = {
-  gray: "text-neutral-600",
-  red: "text-red-600",
-  orange: "text-orange-600",
-  yellow: "text-yellow-600",
-  green: "text-green-600",
-  blue: "text-blue-600",
-  purple: "text-purple-600",
+  gray: "text-neutral-500",
+  red: "text-red-500",
+  orange: "text-orange-500",
+  yellow: "text-yellow-500",
+  green: "text-emerald-500",
+  blue: "text-sky-500",
+  purple: "text-violet-500",
 };
 
 // Shared row chrome for sidebar items (All, collections, group headers, View).
@@ -93,9 +93,9 @@ function AllRow({ selected, count, onSelect }: { selected: boolean; count: numbe
       onClick={onSelect}
       className={`group flex items-center gap-2 py-2 -mt-2 text-sm text-neutral-600 ${SIDEBAR_ROW_CLASS}`}
     >
-      <span className="text-neutral-600 shrink-0 transition-colors group-aria-[current=true]:text-sky-600"><CircleSmall size={16} /></span>
+      <span className="text-neutral-600 group-aria-[current=true]:text-sky-600 transition-colors shrink-0"><CircleSmall size={16} /></span>
       <span className="flex-1 min-w-0 font-normal text-left truncate">All</span>
-      {count > 0 && <span className="shrink-0 text-xs text-neutral-500 transition-colors group-aria-[current=true]:text-sky-500">{count}</span>}
+      {count > 0 && <span className="text-neutral-500 group-aria-[current=true]:text-sky-500 text-xs transition-colors shrink-0">{count}</span>}
     </button>
   );
 }
@@ -228,6 +228,20 @@ export function Sidebar({
       <SidebarContainer
         width={width}
         header={<AllRow selected={selected === ALL_COLLECTION} count={allCount} onSelect={() => onSelect(ALL_COLLECTION)} />}
+        handle={
+          <div
+            onPointerDown={startResize}
+            role="separator"
+            aria-orientation="vertical"
+            className="group top-0 right-0 absolute flex justify-center -mr-4 w-8 h-full cursor-col-resize"
+          >
+            <div
+              className={`h-full w-px transition-colors ${
+                dragging ? "bg-neutral-200" : "bg-neutral-100 group-hover:bg-neutral-200"
+              }`}
+            />
+          </div>
+        }
       >
         <Accordion.Root
           multiple
@@ -245,7 +259,7 @@ export function Sidebar({
           <Accordion.Item key={group.name} value={group.name} className="flex flex-col">
             {/* Sticky group header. Since All is a fixed header outside the scroll
                 area, this pins to the scroll top. bg masks the rows scrolling under. */}
-            <Accordion.Header className="sticky top-0 z-0 bg-white">
+            <Accordion.Header className="top-0 z-0 sticky bg-white">
             <ContextMenu.Root>
               <ContextMenu.Trigger>
                 <Accordion.Trigger
@@ -282,11 +296,11 @@ export function Sidebar({
             </ContextMenu.Root>
             </Accordion.Header>
 
-            <Accordion.Panel className="flex flex-col overflow-hidden h-[var(--accordion-panel-height)] transition-[height] duration-200 ease-out data-[starting-style]:h-0 data-[ending-style]:h-0">
+            <Accordion.Panel className="flex flex-col h-[var(--accordion-panel-height)] data-[ending-style]:h-0 data-[starting-style]:h-0 overflow-hidden transition-[height] duration-200 ease-out">
             {group.collections.length === 0 ? (
               // Empty-group placeholder: no icon, but a spacer matching the icon
               // width keeps the text aligned with the other rows' labels.
-              <div className="flex items-center gap-2 px-2 py-2 text-sm text-neutral-400">
+              <div className="flex items-center gap-2 px-2 py-2 text-neutral-400 text-sm">
                 <span className="w-4 shrink-0" aria-hidden />
                 <span>No Collections</span>
               </div>
@@ -305,7 +319,7 @@ export function Sidebar({
                         : <FilledCircle size={16} />}
                     </span>
                     <span className="flex-1 min-w-0 font-normal text-left truncate">{c.displayName}</span>
-                    {c.incompleteCount > 0 && <span className="shrink-0 text-xs text-neutral-500 transition-colors group-aria-[current=true]:text-sky-500">{c.incompleteCount}</span>}
+                    {c.incompleteCount > 0 && <span className="text-neutral-500 group-aria-[current=true]:text-sky-500 text-xs transition-colors shrink-0">{c.incompleteCount}</span>}
                   </button>
                 </ContextMenu.Trigger>
                 <ContextMenu.Portal>
@@ -474,20 +488,6 @@ export function Sidebar({
             </Menu.Positioner>
           </Menu.Portal>
         </Menu.Root>
-
-        {/* Right-edge resize handle. */}
-        <div
-          onPointerDown={startResize}
-          role="separator"
-          aria-orientation="vertical"
-          className="group top-0 right-0 absolute flex justify-center -mr-4 w-8 h-full cursor-col-resize"
-        >
-          <div
-            className={`h-full w-px transition-colors ${
-              dragging ? "bg-neutral-300" : "bg-neutral-100 group-hover:bg-neutral-200"
-            }`}
-          />
-        </div>
       </SidebarContainer>
     </>
   );

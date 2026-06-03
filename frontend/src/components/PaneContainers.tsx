@@ -8,21 +8,26 @@ import { TITLE_BAR_HEIGHT } from "../layout";
 export function SidebarContainer({
   width,
   header,
+  handle,
   children,
 }: {
   width: number;
   header: ReactNode;
+  handle?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <div
-      className="relative flex h-full shrink-0 flex-col overflow-hidden"
-      style={{ width, paddingTop: TITLE_BAR_HEIGHT }}
-    >
+    // No overflow clipping here: the resize handle (rendered below) extends past
+    // the right edge and must not be clipped. Vertical scrolling is owned by the
+    // body's own overflow-y-auto.
+    <div className="relative flex h-full shrink-0 flex-col" style={{ width, paddingTop: TITLE_BAR_HEIGHT }}>
       {/* Fixed header (the All row) pinned above the scroll area; pb-2 is the gap
           before the scrolling groups. */}
       <div className="shrink-0 px-2 pb-2 select-none">{header}</div>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 select-none">{children}</div>
+      {/* Resize handle lives outside the scroll body so that body's overflow does
+          not clip the handle's outer half (keeps the hover hit area symmetric). */}
+      {handle}
     </div>
   );
 }
