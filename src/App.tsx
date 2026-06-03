@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertDialog, Button, Flex } from "@radix-ui/themes";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { Settings, Snapshot } from "./api/types";
 import {
   createItem,
@@ -93,6 +94,13 @@ export function App() {
       })
       .catch((e) => console.error(e));
   }, []);
+
+  // Apply always-on-top to the window whenever the setting changes (and on mount).
+  useEffect(() => {
+    getCurrentWindow()
+      .setAlwaysOnTop(settings.alwaysOnTop)
+      .catch((e) => console.error(e));
+  }, [settings.alwaysOnTop]);
 
   // Persist the selected collection so it can be restored next launch.
   useEffect(() => {
