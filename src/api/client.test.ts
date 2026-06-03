@@ -6,7 +6,16 @@ const listenMock = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...a: unknown[]) => invokeMock(...a) }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: (...a: unknown[]) => listenMock(...a) }));
 
-import { getSnapshot, onStoreChanged, createItem, setStatus, getSettings, setSettings } from "./client";
+import {
+  getSnapshot,
+  onStoreChanged,
+  createItem,
+  setStatus,
+  getSettings,
+  setSettings,
+  setCollectionPrompt,
+  exportCollection,
+} from "./client";
 
 describe("api client", () => {
   beforeEach(() => { invokeMock.mockReset(); listenMock.mockReset(); });
@@ -65,5 +74,33 @@ describe("api client", () => {
     invokeMock.mockResolvedValue(settings);
     await setSettings(settings);
     expect(invokeMock).toHaveBeenCalledWith("set_settings", { settings });
+  });
+
+  it("setCollectionPrompt invokes set_collection_prompt with name + template", async () => {
+    invokeMock.mockResolvedValue({ items: [], collections: [], groups: [] });
+    await setCollectionPrompt("Work", "My prompt");
+    expect(invokeMock).toHaveBeenCalledWith("set_collection_prompt", {
+      name: "Work",
+      template: "My prompt",
+    });
+  });
+
+  it("setCollectionPrompt passes null to clear the override", async () => {
+    invokeMock.mockResolvedValue({ items: [], collections: [], groups: [] });
+    await setCollectionPrompt("Work", null);
+    expect(invokeMock).toHaveBeenCalledWith("set_collection_prompt", {
+      name: "Work",
+      template: null,
+    });
+  });
+
+  it("exportCollection invokes export_collection with name/format/path", async () => {
+    invokeMock.mockResolvedValue(undefined);
+    await exportCollection("Work", "jsonl", "/tmp/Work.jsonl");
+    expect(invokeMock).toHaveBeenCalledWith("export_collection", {
+      name: "Work",
+      format: "jsonl",
+      path: "/tmp/Work.jsonl",
+    });
   });
 });

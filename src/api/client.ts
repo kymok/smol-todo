@@ -126,3 +126,24 @@ export function setSettings(settings: Settings): Promise<Settings> {
 export function storePath(): Promise<string> {
   return invoke<string>("store_path");
 }
+
+// --- Prompts / export ---
+export function setCollectionPrompt(name: string, template: string | null): Promise<Snapshot> {
+  return invoke<Snapshot>("set_collection_prompt", { name, template });
+}
+
+export function collectionPromptText(name: string): Promise<string> {
+  return invoke<string>("collection_prompt_text", { name });
+}
+
+export function collectionCliCommand(name: string): Promise<string> {
+  return invoke<string>("collection_cli_command", { name });
+}
+
+export function exportCollection(
+  name: string,
+  format: "json" | "jsonl",
+  path: string,
+): Promise<void> {
+  return invoke<void>("export_collection", { name, format, path });
+}
