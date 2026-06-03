@@ -7,13 +7,18 @@ use pond_core::{
 };
 use std::collections::HashMap;
 
-/// Create a new empty Draft (title typed in the editor). `collection` is the
-/// target collection api-name; `None`/empty falls back to the default collection.
-pub fn create_item(store: &TaskStore, collection: Option<&str>) -> Result<SnapshotDto> {
+/// Create a new Draft. `collection` is the target collection api-name (`None`/empty →
+/// the default collection); `title` is the Draft's title (`None` → empty, for Cmd+N /
+/// New Task; `Some(name)` → a file-drop Draft titled with the filename).
+pub fn create_item(
+    store: &TaskStore,
+    collection: Option<&str>,
+    title: Option<&str>,
+) -> Result<SnapshotDto> {
     let target = collection
         .filter(|c| !c.is_empty())
         .unwrap_or(DEFAULT_COLLECTION);
-    store.add("", target, None, true, TaskStatus::Draft)?;
+    store.add(title.unwrap_or(""), target, None, true, TaskStatus::Draft)?;
     build_snapshot(store)
 }
 
@@ -242,7 +247,7 @@ mod tests {
     #[test]
     fn create_item_adds_a_draft() {
         let (_dir, store) = store();
-        let snap = create_item(&store, None).unwrap();
+        let snap = create_item(&store, None, None).unwrap();
         assert_eq!(snap.items.len(), 1);
         assert_eq!(snap.items[0].status, TaskStatus::Draft);
         assert_eq!(snap.items[0].title, "");
@@ -252,7 +257,7 @@ mod tests {
     #[test]
     fn create_item_honors_explicit_collection() {
         let (_dir, store) = store();
-        let snap = create_item(&store, Some("Work/Docs")).unwrap();
+        let snap = create_item(&store, Some("Work/Docs"), None).unwrap();
         assert_eq!(snap.items.len(), 1);
         assert_eq!(snap.items[0].collection, "Work/Docs");
     }
@@ -636,5 +641,25 @@ mod tests {
             serde_json::from_str(r#"{"ready":"completed","in-progress":"on-hold"}"#).unwrap();
         assert_eq!(map.get(&TaskStatus::Ready), Some(&TaskStatus::Completed));
         assert_eq!(map.get(&TaskStatus::InProgress), Some(&TaskStatus::OnHold));
+    }
+
+    #[test]
+    fn create_item_title_none_is_empty_draft() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        let snap = create_item(&store, Some("Work"), None).unwrap();
+        let item = snap.items.iter().find(|i| i.collection == "Work").unwrap();
+        assert_eq!(item.title, "");
+        assert_eq!(item.status, TaskStatus::Draft);
+    }
+
+    #[test]
+    fn create_item_title_some_creates_titled_draft() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        let snap = create_item(&store, Some("Work"), Some("foo.txt")).unwrap();
+        let item = snap.items.iter().find(|i| i.title == "foo.txt").unwrap();
+        assert_eq!(item.collection, "Work");
+        assert_eq!(item.status, TaskStatus::Draft);
     }
 }

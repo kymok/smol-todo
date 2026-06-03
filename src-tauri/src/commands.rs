@@ -34,8 +34,10 @@ pub fn get_snapshot(store: State<TaskStore>) -> std::result::Result<SnapshotDto,
 pub fn create_item(
     store: State<TaskStore>,
     collection: Option<String>,
+    title: Option<String>,
 ) -> std::result::Result<SnapshotDto, String> {
-    mutations::create_item(&store, collection.as_deref()).map_err(|e| e.to_string())
+    mutations::create_item(&store, collection.as_deref(), title.as_deref())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
