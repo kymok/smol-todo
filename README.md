@@ -92,7 +92,15 @@ The store path honors `POND_STORE`.
 Install the Tauri CLI once: `cargo install tauri-cli --version "^2"` (or use `npx @tauri-apps/cli`).
 
 - Dev (hot-reload): `cargo tauri dev` — launches the window against the Vite dev server.
-- The window renders the store read-only; edits made by `taskpond` (the CLI) appear live.
+- The window supports full editing: create, rename, delete, status changes, notes, inline title/note editing, collection and group management.
+- Edits made by `taskpond` (the CLI) also appear live via the file watcher.
 - The store path honors `POND_STORE`.
+
+**Keyboard shortcuts:**
+- `Cmd+N` — create a new task in the selected collection.
+- `Cmd+Backspace` — delete the focused task.
+- `Enter` (in title editor) — split at caret; `Cmd+Enter` — confirm title.
+- `Backspace` at start of a title — merge into the previous task (if it is a note-free draft or ready task).
+- `Esc` — discard edits.
 
 Frontend-only checks: `npm test` (Vitest), `npm run build` (typecheck + bundle).
