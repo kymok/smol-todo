@@ -27,6 +27,7 @@ export interface InlineEditorProps {
   onEndEdit: () => void;
   onMoveFocus: (dir: FocusDir) => void;
   onSnapshot: (snap: Snapshot) => void;
+  onError: (msg: string) => void;
 }
 
 /** Swift mergeWithPrevious precondition: previous is draft/ready AND has no note. */
@@ -48,6 +49,7 @@ export function InlineEditor({
   onEndEdit,
   onMoveFocus,
   onSnapshot,
+  onError,
 }: InlineEditorProps) {
   const initial = field === "title" ? item.title : (item.note?.body ?? "");
   const [draft, setDraft] = useState(initial);
@@ -121,7 +123,7 @@ export function InlineEditor({
         }
       }
     } catch (e) {
-      console.error(e);
+      onError(String(e));
     } finally {
       if (!opts?.fromAutosave) onEndEdit();
     }
@@ -147,12 +149,12 @@ export function InlineEditor({
         if (second.trim().length === 0) {
           // Caret at end → create an empty draft below (Swift createItemBelowFromTitle).
           // First, persist the current (non-empty) title, then create below.
-          await updateItem(item.id, { title: first }, item).then(onSnapshot).catch(console.error);
-          await createItem(item.collection).then(onSnapshot).catch(console.error);
+          await updateItem(item.id, { title: first }, item).then(onSnapshot).catch((e) => onError(String(e)));
+          await createItem(item.collection).then(onSnapshot).catch((e) => onError(String(e)));
         } else if (first.trim().length === 0) {
           // No usable first title → no-op (Swift returns true without splitting).
         } else {
-          await splitItem(item.id, first, second).then(onSnapshot).catch(console.error);
+          await splitItem(item.id, first, second).then(onSnapshot).catch((e) => onError(String(e)));
         }
         onEndEdit();
         break;
@@ -160,7 +162,7 @@ export function InlineEditor({
       case "MergeIntoPrevious": {
         clearTimer();
         if (canMergeInto(previous)) {
-          await mergeItem(item.id, previous.id, draft).then(onSnapshot).catch(console.error);
+          await mergeItem(item.id, previous.id, draft).then(onSnapshot).catch((e) => onError(String(e)));
           onEndEdit();
         }
         // If not mergeable, swallow the Backspace (do nothing) — matches Swift gate.
@@ -182,7 +184,7 @@ export function InlineEditor({
             const fields = status ? { title: draft, status } : { title: draft };
             onSnapshot(await updateItem(item.id, fields, item));
           } catch (e) {
-            console.error(e);
+            onError(String(e));
           } finally {
             onEndEdit();
           }
@@ -195,9 +197,9 @@ export function InlineEditor({
       case "DeleteEmpty": {
         clearTimer();
         if (field === "title") {
-          await deleteItem(item.id).then(onSnapshot).catch(console.error);
+          await deleteItem(item.id).then(onSnapshot).catch((e) => onError(String(e)));
         } else if (item.note) {
-          await deleteNote(item.id, item).then(onSnapshot).catch(console.error);
+          await deleteNote(item.id, item).then(onSnapshot).catch((e) => onError(String(e)));
         }
         onEndEdit();
         if (intent.thenFocus) onMoveFocus(intent.thenFocus);

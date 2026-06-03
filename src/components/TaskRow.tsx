@@ -29,20 +29,21 @@ export interface TaskRowProps {
   onEndEdit: () => void;
   onMoveFocus: (dir: FocusDir) => void;
   onSnapshot: (snap: Snapshot) => void;
+  onError: (msg: string) => void;
 }
 
 export function TaskRow({
   item, previous, showCollection, collections,
-  focused, editingField, usesAutoDraft, onFocus, onEditTitle, onEditNote, onEndEdit, onMoveFocus, onSnapshot,
+  focused, editingField, usesAutoDraft, onFocus, onEditTitle, onEditNote, onEndEdit, onMoveFocus, onSnapshot, onError,
 }: TaskRowProps) {
   const advance = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setStatus(leadingStatusClickTarget(item.status), item.id, item).then(onSnapshot).catch(console.error);
+    setStatus(leadingStatusClickTarget(item.status), item.id, item).then(onSnapshot).catch((e) => onError(String(e)));
   };
   const toDraft = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setStatus(rightClickStatusTarget(item.status), item.id, item).then(onSnapshot).catch(console.error);
+    setStatus(rightClickStatusTarget(item.status), item.id, item).then(onSnapshot).catch((e) => onError(String(e)));
   };
 
   return (
@@ -75,6 +76,7 @@ export function TaskRow({
               onEndEdit={onEndEdit}
               onMoveFocus={onMoveFocus}
               onSnapshot={onSnapshot}
+              onError={onError}
             />
             <InlineEditor
               item={item}
@@ -85,6 +87,7 @@ export function TaskRow({
               onEndEdit={onEndEdit}
               onMoveFocus={onMoveFocus}
               onSnapshot={onSnapshot}
+              onError={onError}
             />
           </Flex>
           {showCollection ? (
@@ -101,7 +104,7 @@ export function TaskRow({
               <ContextMenu.Item
                 key={s}
                 onSelect={() =>
-                  setStatus(s, item.id, item).then(onSnapshot).catch(console.error)
+                  setStatus(s, item.id, item).then(onSnapshot).catch((e) => onError(String(e)))
                 }
               >
                 {s}
@@ -117,7 +120,7 @@ export function TaskRow({
               <ContextMenu.Item
                 key={c.name}
                 disabled={c.name === item.collection}
-                onSelect={() => moveItem(item.id, c.name).then(onSnapshot).catch(console.error)}
+                onSelect={() => moveItem(item.id, c.name).then(onSnapshot).catch((e) => onError(String(e)))}
               >
                 {c.displayName}
               </ContextMenu.Item>
@@ -128,7 +131,7 @@ export function TaskRow({
         <ContextMenu.Separator />
         <ContextMenu.Item
           color="red"
-          onSelect={() => deleteItem(item.id).then(onSnapshot).catch(console.error)}
+          onSelect={() => deleteItem(item.id).then(onSnapshot).catch((e) => onError(String(e)))}
         >
           Delete
         </ContextMenu.Item>

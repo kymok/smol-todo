@@ -38,6 +38,8 @@ export function App() {
   const [editingTarget, setEditingTarget] = useState<{ id: string; field: "title" | "note" } | null>(null);
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const onError = useCallback((msg: string) => setErrorMessage(msg), []);
   const [settings, setSettingsState] = useState<Settings>(DEFAULT_SETTINGS);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
@@ -136,7 +138,7 @@ export function App() {
               setEditingTarget({ id: created.id, field: "title" });
             }
           })
-          .catch((err) => console.error(err));
+          .catch((err) => onError(String(err)));
       } else if (e.metaKey && (e.key === "Backspace" || e.key === "Delete")) {
         const target = e.target as HTMLElement | null;
         if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
@@ -145,7 +147,7 @@ export function App() {
         const id = focusRef.current;
         if (id) {
           e.preventDefault();
-          deleteItem(id).then(setSnapshot).catch((err) => console.error(err));
+          deleteItem(id).then(setSnapshot).catch((err) => onError(String(err)));
         }
       }
     };
@@ -169,6 +171,7 @@ export function App() {
         onToggleAlwaysOnTop={() => updateSettings({ alwaysOnTop: !settingsRef.current.alwaysOnTop })}
         onOpenSettings={() => setSettingsOpen(true)}
         onSnapshot={apply}
+        onError={onError}
         onRequestConfirm={requestConfirm}
       />
       <DetailPane
@@ -182,10 +185,23 @@ export function App() {
         onEdit={onEdit}
         onEndEdit={onEndEdit}
         onSnapshot={apply}
+        onError={onError}
         onRequestConfirm={requestConfirm}
       />
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+
+      <AlertDialog.Root open={errorMessage !== null} onOpenChange={(o) => { if (!o) setErrorMessage(null); }}>
+        <AlertDialog.Content maxWidth="420px">
+          <AlertDialog.Title>Something went wrong</AlertDialog.Title>
+          <AlertDialog.Description size="2">{errorMessage ?? ""}</AlertDialog.Description>
+          <Flex gap="3" mt="4" justify="end">
+            <AlertDialog.Action>
+              <Button onClick={() => setErrorMessage(null)}>OK</Button>
+            </AlertDialog.Action>
+          </Flex>
+        </AlertDialog.Content>
+      </AlertDialog.Root>
 
       <AlertDialog.Root open={confirm !== null} onOpenChange={(o) => { if (!o) setConfirm(null); }}>
         <AlertDialog.Content maxWidth="420px">

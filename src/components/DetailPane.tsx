@@ -18,12 +18,13 @@ export interface DetailPaneProps {
   onEdit: (id: string, field: "title" | "note") => void;
   onEndEdit: () => void;
   onSnapshot: (snap: Snapshot) => void;
+  onError: (msg: string) => void;
   onRequestConfirm: (req: ConfirmRequest) => void;
 }
 
 export function DetailPane({
   snapshot, view, focusedId, editingTarget, usesAutoDraft,
-  onSearch, onFocusItem, onEdit, onEndEdit, onSnapshot,
+  onSearch, onFocusItem, onEdit, onEndEdit, onSnapshot, onError,
 }: DetailPaneProps) {
   const items = visibleItems(snapshot, view);
   const title = view.selected === ALL_COLLECTION
@@ -42,7 +43,7 @@ export function DetailPane({
           onEdit(created.id, "title");
         }
       })
-      .catch(console.error);
+      .catch((e) => onError(String(e)));
   };
 
   const moveFocus = (dir: FocusDir) => {
@@ -87,6 +88,7 @@ export function DetailPane({
               onEndEdit={onEndEdit}
               onMoveFocus={moveFocus}
               onSnapshot={onSnapshot}
+              onError={onError}
             />
           ))}
         </Flex>

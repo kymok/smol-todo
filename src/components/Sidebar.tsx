@@ -34,13 +34,14 @@ export interface SidebarProps {
   onToggleAlwaysOnTop: () => void;
   onOpenSettings: () => void;
   onSnapshot: (snap: Snapshot) => void;
+  onError: (msg: string) => void;
   onRequestConfirm: (req: ConfirmRequest) => void;
 }
 
 export function Sidebar({
   snapshot, selected, showArchived, hideCompleted, usesAutoDraft, alwaysOnTop,
   onSelect, onToggleHideCompleted, onToggleShowArchived, onToggleAutoDraft, onToggleAlwaysOnTop,
-  onOpenSettings, onSnapshot, onRequestConfirm,
+  onOpenSettings, onSnapshot, onError, onRequestConfirm,
 }: SidebarProps) {
   const groupNames = snapshot.groups.map((g) => g.name);
 
@@ -58,7 +59,7 @@ export function Sidebar({
       title: "Rename Collection",
       label: "New name",
       initial: c.displayName,
-      submit: (v) => { renameCollection(c.name, v).then(onSnapshot).catch(console.error); },
+      submit: (v) => { renameCollection(c.name, v).then(onSnapshot).catch((e) => onError(String(e))); },
     });
   };
 
@@ -67,7 +68,7 @@ export function Sidebar({
       title: "Rename Group",
       label: "New name",
       initial: group.name,
-      submit: (v) => renameGroup(group.name, v).then(onSnapshot).catch(console.error),
+      submit: (v) => renameGroup(group.name, v).then(onSnapshot).catch((e) => onError(String(e))),
     });
   };
 
@@ -76,7 +77,7 @@ export function Sidebar({
       title: "New Collection",
       label: "Collection name",
       initial: "",
-      submit: (v) => createCollection(v, group.name).then(onSnapshot).catch(console.error),
+      submit: (v) => createCollection(v, group.name).then(onSnapshot).catch((e) => onError(String(e))),
     });
   };
 
@@ -135,7 +136,7 @@ export function Sidebar({
                       title: `Delete group "${group.name}"?`,
                       description: "Its collections move to No Group. This cannot be undone.",
                       confirmLabel: "Delete",
-                      onConfirm: () => deleteGroup(group.name).then(onSnapshot).catch(console.error),
+                      onConfirm: () => deleteGroup(group.name).then(onSnapshot).catch((e) => onError(String(e))),
                     })
                   }
                 >
@@ -168,7 +169,7 @@ export function Sidebar({
                       {COLORS.map((color) => (
                         <ContextMenu.Item
                           key={color}
-                          onSelect={() => setCollectionColor(c.name, color).then(onSnapshot).catch(console.error)}
+                          onSelect={() => setCollectionColor(c.name, color).then(onSnapshot).catch((e) => onError(String(e)))}
                         >
                           <Text color={color}><DotFilledIcon /></Text> {color}
                         </ContextMenu.Item>
@@ -178,7 +179,7 @@ export function Sidebar({
 
                   <ContextMenu.Item
                     onSelect={() =>
-                      setCollectionArchived(c.name, !c.isArchived).then(onSnapshot).catch(console.error)
+                      setCollectionArchived(c.name, !c.isArchived).then(onSnapshot).catch((e) => onError(String(e)))
                     }
                   >
                     {c.isArchived ? "Unarchive" : "Archive"}
@@ -191,7 +192,7 @@ export function Sidebar({
                         <ContextMenu.Item
                           key={g}
                           disabled={g === c.groupName}
-                          onSelect={() => moveCollection(c.name, g).then(onSnapshot).catch(console.error)}
+                          onSelect={() => moveCollection(c.name, g).then(onSnapshot).catch((e) => onError(String(e)))}
                         >
                           {g === "DefaultGroup" ? "No Group" : g}
                         </ContextMenu.Item>
@@ -202,10 +203,10 @@ export function Sidebar({
                   <ContextMenu.Sub>
                     <ContextMenu.SubTrigger>Clear</ContextMenu.SubTrigger>
                     <ContextMenu.SubContent>
-                      <ContextMenu.Item onSelect={() => clearItems(c.name, false).then(onSnapshot).catch(console.error)}>
+                      <ContextMenu.Item onSelect={() => clearItems(c.name, false).then(onSnapshot).catch((e) => onError(String(e)))}>
                         All Items
                       </ContextMenu.Item>
-                      <ContextMenu.Item onSelect={() => clearItems(c.name, true).then(onSnapshot).catch(console.error)}>
+                      <ContextMenu.Item onSelect={() => clearItems(c.name, true).then(onSnapshot).catch((e) => onError(String(e)))}>
                         Completed Items
                       </ContextMenu.Item>
                     </ContextMenu.SubContent>
@@ -219,7 +220,7 @@ export function Sidebar({
                         title: `Delete collection "${c.displayName}"?`,
                         description: "All its tasks are permanently deleted. This cannot be undone.",
                         confirmLabel: "Delete",
-                        onConfirm: () => deleteCollection(c.name).then(onSnapshot).catch(console.error),
+                        onConfirm: () => deleteCollection(c.name).then(onSnapshot).catch((e) => onError(String(e))),
                       })
                     }
                   >
@@ -257,7 +258,7 @@ export function Sidebar({
                   title: "New Group",
                   label: "Group name",
                   initial: "",
-                  submit: (v) => createGroup(v).then(onSnapshot).catch(console.error),
+                  submit: (v) => createGroup(v).then(onSnapshot).catch((e) => onError(String(e))),
                 })
               }
             >
