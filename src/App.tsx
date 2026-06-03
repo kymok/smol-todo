@@ -223,7 +223,12 @@ export function App() {
         onRequestConfirm={requestConfirm}
       />
 
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        settings={settings}
+        updateSettings={updateSettings}
+      />
 
       <PromptEditorDialog
         collection={promptCollection}
