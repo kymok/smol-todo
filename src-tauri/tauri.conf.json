@@ -6,12 +6,12 @@
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeDevCommand": "node Scripts/build-sidecar.mjs debug && npm run dev",
+    "beforeBuildCommand": "node Scripts/build-sidecar.mjs release && npm run build"
   },
   "app": {
     "windows": [{ "label": "main", "title": "Pond", "width": 900, "height": 600, "minWidth": 480, "minHeight": 320 }],
     "security": { "csp": null }
   },
-  "bundle": { "active": true, "targets": "all", "icon": ["icons/icon.png"] }
+  "bundle": { "active": true, "targets": "all", "icon": ["icons/icon.png"], "externalBin": ["binaries/taskpond"] }
 }

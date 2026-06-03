@@ -10,6 +10,7 @@ tmp/
 # Rust / Cargo build output
 /target/
 /src-tauri/gen/
+/src-tauri/binaries/
 
 # Node / frontend build output
 node_modules/
