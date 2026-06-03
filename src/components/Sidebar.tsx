@@ -1,11 +1,24 @@
 import { Badge, Box, Button, Flex, Text } from "@radix-ui/themes";
 import { DotFilledIcon } from "@radix-ui/react-icons";
 import type { Snapshot } from "../api/types";
+import type { ConfirmRequest } from "../state/confirm";
 import { ALL_COLLECTION, allIncompleteCount, sidebarGroups } from "../state/view";
 
+export interface SidebarProps {
+  snapshot: Snapshot;
+  selected: string;
+  showArchived: boolean;
+  hideCompleted: boolean;
+  onSelect: (name: string) => void;
+  onToggleHideCompleted: () => void;
+  onToggleShowArchived: () => void;
+  onSnapshot: (snap: Snapshot) => void;
+  onRequestConfirm: (req: ConfirmRequest) => void;
+}
+
 export function Sidebar({
-  snapshot, selected, onSelect,
-}: { snapshot: Snapshot; selected: string; onSelect: (name: string) => void }) {
+  snapshot, selected, showArchived, onSelect,
+}: SidebarProps) {
   return (
     <Flex direction="column" gap="1" p="2" style={{ width: 240 }}>
       <Button variant={selected === ALL_COLLECTION ? "soft" : "ghost"} onClick={() => onSelect(ALL_COLLECTION)}>
@@ -14,7 +27,7 @@ export function Sidebar({
           <Badge>{allIncompleteCount(snapshot)}</Badge>
         </Flex>
       </Button>
-      {sidebarGroups(snapshot, false).map((group) => (
+      {sidebarGroups(snapshot, showArchived).map((group) => (
         <Box key={group.name} mt="2">
           <Text size="1" color="gray">{group.name === "DefaultGroup" ? "No Group" : group.name}</Text>
           {group.collections.map((c) => (
