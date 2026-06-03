@@ -18,6 +18,9 @@ fn main() {
             commands::move_item,
             commands::delete_item,
             commands::delete_items,
+            commands::add_note,
+            commands::update_note,
+            commands::delete_note,
         ])
         .setup(|app| {
             app.manage(pond_core::TaskStore::open_default());

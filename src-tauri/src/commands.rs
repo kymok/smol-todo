@@ -88,6 +88,34 @@ pub fn delete_items(
     mutations::delete_items(&store, &ids).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn add_note(
+    store: State<TaskStore>,
+    id: String,
+    body: String,
+    if_current: Option<TaskItem>,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::add_note(&store, &id, &body, if_current).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_note(
+    store: State<TaskStore>,
+    id: String,
+    body: String,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::update_note(&store, &id, &body).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_note(
+    store: State<TaskStore>,
+    id: String,
+    if_current: Option<TaskItem>,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::delete_note(&store, &id, if_current).map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

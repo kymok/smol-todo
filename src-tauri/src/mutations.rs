@@ -63,6 +63,44 @@ pub fn delete_items(store: &TaskStore, ids: &[String]) -> Result<SnapshotDto> {
     build_snapshot(store)
 }
 
+pub fn add_note(
+    store: &TaskStore,
+    id: &str,
+    body: &str,
+    if_current: Option<TaskItem>,
+) -> Result<SnapshotDto> {
+    match if_current {
+        Some(expected) => {
+            store.add_note_if_current(id, body, &expected)?;
+        }
+        None => {
+            store.add_note(id, body)?;
+        }
+    }
+    build_snapshot(store)
+}
+
+pub fn update_note(store: &TaskStore, id: &str, body: &str) -> Result<SnapshotDto> {
+    store.update_note(id, body)?;
+    build_snapshot(store)
+}
+
+pub fn delete_note(
+    store: &TaskStore,
+    id: &str,
+    if_current: Option<TaskItem>,
+) -> Result<SnapshotDto> {
+    match if_current {
+        Some(expected) => {
+            store.delete_note_if_current(id, &expected)?;
+        }
+        None => {
+            store.delete_note(id)?;
+        }
+    }
+    build_snapshot(store)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -184,5 +222,46 @@ mod tests {
         assert_eq!(snap.items.len(), 1);
         let snap = delete_items(&store, &[b.id]).unwrap();
         assert_eq!(snap.items.len(), 0);
+    }
+
+    #[test]
+    fn add_update_delete_note() {
+        let (_dir, store) = store();
+        let item = seed(&store, "t");
+        let snap = add_note(&store, &item.id, "first body", None).unwrap();
+        assert_eq!(snap.items[0].note.as_ref().unwrap().body, "first body");
+
+        let snap = update_note(&store, &item.id, "second body").unwrap();
+        assert_eq!(snap.items[0].note.as_ref().unwrap().body, "second body");
+
+        let snap = delete_note(&store, &item.id, None).unwrap();
+        assert!(snap.items[0].note.is_none());
+    }
+
+    #[test]
+    fn add_note_if_current_skips_stale() {
+        let (_dir, store) = store();
+        let item = seed(&store, "t");
+        store
+            .set_status(TaskStatus::OnHold, std::slice::from_ref(&item.id), None)
+            .unwrap();
+        // `item` stale → guarded add is a no-op, note stays absent.
+        let snap = add_note(&store, &item.id, "ignored", Some(item.clone())).unwrap();
+        assert!(snap.items[0].note.is_none());
+    }
+
+    #[test]
+    fn delete_note_if_current_skips_stale() {
+        let (_dir, store) = store();
+        let item = seed(&store, "t");
+        // Add a note so there is something to (attempt to) delete.
+        store.add_note(&item.id, "body").unwrap();
+        // Mutate out-of-band so the seeded handle becomes stale.
+        store
+            .set_status(TaskStatus::Completed, std::slice::from_ref(&item.id), None)
+            .unwrap();
+        // Guarded delete with the stale item must be a no-op; note stays present.
+        let snap = delete_note(&store, &item.id, Some(item.clone())).unwrap();
+        assert!(snap.items[0].note.is_some());
     }
 }
