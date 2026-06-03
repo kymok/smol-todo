@@ -1,10 +1,7 @@
 import { ScrollArea } from "@base-ui-components/react/scroll-area";
-import { Input } from "@base-ui-components/react/input";
-import { Search, Plus } from "lucide-react";
 import type { Snapshot } from "../api/types";
 import type { ConfirmRequest } from "../state/confirm";
 import { ALL_COLLECTION, visibleItems, type ViewState } from "../state/view";
-import { createItem } from "../api/client";
 import type { FocusDir } from "../state/editor";
 import { TaskRow } from "./TaskRow";
 import { DetailContainer } from "./PaneContainers";
@@ -27,27 +24,12 @@ export interface DetailPaneProps {
 
 export function DetailPane({
   snapshot, view, focusedId, editingTarget, usesAutoDraft,
-  onSearch, onFocusItem, onEdit, onEndEdit, onSnapshot, onError,
+  onFocusItem, onEdit, onEndEdit, onSnapshot, onError,
 }: DetailPaneProps) {
   const items = visibleItems(snapshot, view);
   const title = view.selected === ALL_COLLECTION
     ? "All"
     : snapshot.collections.find((c) => c.name === view.selected)?.displayName ?? view.selected;
-
-  const newTask = () => {
-    const target = view.selected === ALL_COLLECTION ? undefined : view.selected;
-    createItem(target)
-      .then((snap) => {
-        onSnapshot(snap);
-        const created = [...snap.items].reverse()
-          .find((i) => i.title === "" && i.status === "draft" && (!target || i.collection === target));
-        if (created) {
-          onFocusItem(created.id);
-          onEdit(created.id, "title");
-        }
-      })
-      .catch((e) => onError(String(e)));
-  };
 
   const moveFocus = (dir: FocusDir) => {
     if (items.length === 0) return;
@@ -64,18 +46,12 @@ export function DetailPane({
 
   return (
     <DetailContainer>
-      {/* Title bar: collection title vertically centered in the title-bar-height
-          strip, with the New Task (+) button pinned to the right end. */}
-      <div className="flex items-center justify-between" style={{ height: TITLE_BAR_HEIGHT }}>
+      {/* Title bar: collection title vertically centered in the title-bar-height strip. */}
+      <div className="flex shrink-0 items-center" style={{ height: TITLE_BAR_HEIGHT }}>
         <h2>{title}</h2>
-        <button onClick={newTask} aria-label="New Task"><Plus /></button>
       </div>
-      <div>
-        <Search />
-        <Input placeholder="Search" value={view.search} onChange={(e) => onSearch(e.target.value)} />
-      </div>
-      <ScrollArea.Root>
-        <ScrollArea.Viewport>
+      <ScrollArea.Root className="min-h-0 flex-1">
+        <ScrollArea.Viewport className="h-full">
           {items.map((item, i) => (
             <TaskRow
               key={item.id}

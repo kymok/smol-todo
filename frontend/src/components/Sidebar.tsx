@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { Accordion } from "@base-ui-components/react/accordion";
 import { ContextMenu } from "@base-ui-components/react/context-menu";
 import { Dialog } from "@base-ui-components/react/dialog";
@@ -105,6 +105,20 @@ export function Sidebar({
     setClosedGroups(visibleGroups.map((g) => g.name).filter((name) => !open.includes(name)));
   };
 
+  // Group headers stick just below the sticky "All" header, so their `top` must
+  // equal the All header's height. Measure it (and track padding/font changes).
+  const allHeaderRef = useRef<HTMLDivElement>(null);
+  const [groupStickyTop, setGroupStickyTop] = useState(0);
+  useLayoutEffect(() => {
+    const el = allHeaderRef.current;
+    if (!el) return;
+    const update = () => setGroupStickyTop(el.offsetHeight);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const [width, setWidth] = useState(() => clamp(DEFAULT_WIDTH, minWidth, maxWidth));
   const [dragging, setDragging] = useState(false);
 
@@ -210,21 +224,24 @@ export function Sidebar({
       </Dialog.Root>
 
       <SidebarContainer width={width}>
+        {/* Sticky header: All plus the gap below it stays pinned while the groups
+            scroll under it. bg matches the (white) sidebar canvas so scrolled rows
+            are masked; pb-2 is the fixed gap. */}
+        <div ref={allHeaderRef} className="sticky top-0 z-10 bg-white pb-2">
         <button
           aria-current={selected === ALL_COLLECTION}
           onClick={() => onSelect(ALL_COLLECTION)}
-          className={`group flex items-center gap-2 py-2 -mt-2 text-sm text-neutral-600 ${SIDEBAR_ROW_CLASS}`}
+          className={`group flex items-center gap-2 py-2 text-sm text-neutral-600 ${SIDEBAR_ROW_CLASS}`}
         >
           <span className="text-neutral-600 shrink-0 transition-colors group-aria-[current=true]:text-sky-600"><CircleSmall size={16} /></span>
           <span className="flex-1 min-w-0 font-normal text-left truncate">All</span>
           {allCount > 0 && <span className="shrink-0 text-xs text-neutral-500 transition-colors group-aria-[current=true]:text-sky-500">{allCount}</span>}
         </button>
+        </div>
 
-        {/* Keep mt-* (gap above the first group, i.e. between All and the groups)
-            in sync with gap-* (gap between groups) so the spacing stays uniform. */}
         <Accordion.Root
           multiple
-          className="flex flex-col gap-2 mt-2"
+          className="flex flex-col gap-2"
           value={openGroupValue}
           onValueChange={handleGroupOpenChange}
         >

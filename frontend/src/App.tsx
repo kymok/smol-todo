@@ -242,7 +242,7 @@ export function App() {
       : snapshot.collections.find((c) => c.name === promptCollection)?.promptTemplate;
 
   return (
-    <div onMouseDown={startWindowDrag} style={{ position: "relative", display: "flex", height: "100vh" }}>
+    <div onMouseDown={startWindowDrag} style={{ position: "relative", display: "flex", height: "100vh", overflow: "hidden" }}>
       <Sidebar
         snapshot={snapshot}
         selected={view.selected}
