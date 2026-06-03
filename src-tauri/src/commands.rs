@@ -2,6 +2,7 @@ use crate::dto::{CollectionGroupSummaryDto, CollectionSummaryDto, SnapshotDto};
 use crate::mutations;
 use crate::prompt;
 use crate::settings::{self, Settings};
+use pond_core::export::ExportFormat;
 use pond_core::{CollectionColor, Result, TaskItem, TaskStatus, TaskStore};
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -293,6 +294,26 @@ pub fn collection_prompt_text(
 #[tauri::command]
 pub fn collection_cli_command(name: String) -> String {
     prompt::cli_command(&name)
+}
+
+#[tauri::command]
+pub fn export_collection(
+    store: State<TaskStore>,
+    name: String,
+    format: String,
+    path: String,
+) -> std::result::Result<(), String> {
+    let fmt = match format.as_str() {
+        "json" => ExportFormat::Json,
+        "jsonl" => ExportFormat::Jsonl,
+        other => return Err(format!("unknown export format: {other}")),
+    };
+    let contents = mutations::export_text(&store, &name, fmt).map_err(|e| e.to_string())?;
+    let target = std::path::Path::new(&path);
+    let tmp = target.with_extension("tmp");
+    std::fs::write(&tmp, contents.as_bytes()).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, target).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[cfg(test)]

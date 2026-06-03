@@ -1,5 +1,7 @@
 use crate::commands::build_snapshot;
 use crate::dto::SnapshotDto;
+use chrono::Utc;
+use pond_core::export::{ExportFormat, ExportPayload};
 use pond_core::{
     CollectionColor, Result, TaskItem, TaskStatus, TaskStore, DEFAULT_COLLECTION, DEFAULT_GROUP,
 };
@@ -198,9 +200,22 @@ pub fn set_collection_prompt(
     build_snapshot(store)
 }
 
+/// Encode a collection's items as JSON or JSONL via pond-core's `ExportPayload`.
+/// The timestamp is `Utc::now()`, so callers/tests must treat the output's time
+/// as non-deterministic.
+pub fn export_text(store: &TaskStore, name: &str, format: ExportFormat) -> Result<String> {
+    let payload = ExportPayload {
+        collection: name.to_string(),
+        exported_at: Utc::now(),
+        items: store.items(None, Some(name), &[], None)?,
+    };
+    payload.encode(format)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pond_core::export::ExportFormat;
     use pond_core::{CollectionColor, TaskStatus, DEFAULT_GROUP};
     use tempfile::tempdir;
 
@@ -482,5 +497,64 @@ mod tests {
         let snap = set_collection_prompt(&store, "Work", Some("   ")).unwrap();
         let work = snap.collections.iter().find(|c| c.name == "Work").unwrap();
         assert_eq!(work.prompt_template, None);
+    }
+
+    #[test]
+    fn export_text_json_has_wrapper_keys() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add("Alpha", "Work", None, false, TaskStatus::Ready)
+            .unwrap();
+        store
+            .add("Beta", "Work", None, false, TaskStatus::Ready)
+            .unwrap();
+
+        let out = export_text(&store, "Work", ExportFormat::Json).unwrap();
+        // Pretty JSON wrapper (camelCase keys).
+        assert!(out.contains("\"collection\""));
+        assert!(out.contains("\"exportedAt\""));
+        assert!(out.contains("\"items\""));
+        assert!(out.contains("\"Work\""));
+        assert!(out.contains("Alpha"));
+        assert!(out.contains("Beta"));
+    }
+
+    #[test]
+    fn export_text_jsonl_is_one_item_per_line() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add("Alpha", "Work", None, false, TaskStatus::Ready)
+            .unwrap();
+        store
+            .add("Beta", "Work", None, false, TaskStatus::Ready)
+            .unwrap();
+
+        let out = export_text(&store, "Work", ExportFormat::Jsonl).unwrap();
+        // Trailing newline; two content lines; no wrapper object.
+        assert!(out.ends_with('\n'));
+        let lines: Vec<&str> = out.trim_end().split('\n').collect();
+        assert_eq!(lines.len(), 2);
+        assert!(!out.contains("\"items\""));
+        assert!(lines.iter().any(|l| l.contains("Alpha")));
+        assert!(lines.iter().any(|l| l.contains("Beta")));
+    }
+
+    #[test]
+    fn export_text_empty_collection() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        // No items added to "Empty"; create the collection so it exists.
+        store.create_collection("Empty", DEFAULT_GROUP).unwrap();
+
+        // JSONL of an empty collection is the empty string (pond-core contract).
+        let jsonl = export_text(&store, "Empty", ExportFormat::Jsonl).unwrap();
+        assert_eq!(jsonl, "");
+
+        // JSON still emits the wrapper with an empty items array.
+        let json = export_text(&store, "Empty", ExportFormat::Json).unwrap();
+        assert!(json.contains("\"items\""));
+        assert!(json.contains("\"Empty\""));
     }
 }

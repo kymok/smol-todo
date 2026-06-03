@@ -43,6 +43,7 @@ fn main() {
             commands::set_collection_prompt,
             commands::collection_prompt_text,
             commands::collection_cli_command,
+            commands::export_collection,
         ])
         .setup(|app| {
             app.manage(pond_core::TaskStore::open_default());
