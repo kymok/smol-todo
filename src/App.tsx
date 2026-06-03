@@ -52,6 +52,13 @@ export function App() {
   const focusRef = useRef(focusedId);
   focusRef.current = focusedId;
 
+  // Restore-on-launch guards: settingsLoadedRef becomes true once getSettings()
+  // resolves; restoredRef becomes true once the one-shot restore runs (or is
+  // deliberately skipped) so it never fires again.
+  const settingsLoadedRef = useRef(false);
+  const pendingLastCollectionRef = useRef<string | null>(null);
+  const restoredRef = useRef(false);
+
   // Initial load + external (CLI) edits.
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -85,19 +92,38 @@ export function App() {
       .catch((e) => console.error(e));
   }, []);
 
-  // Fetch settings on mount; restore lastSelectedCollection if it still exists.
+  // Fetch settings on mount; stash lastSelectedCollection for the snapshot-gated restore below.
   useEffect(() => {
     getSettings()
       .then((s) => {
         setSettingsState(s);
-        const last = s.lastSelectedCollection;
-        if (last) {
-          const exists = snapRef.current.collections.some((c) => c.name === last);
-          if (exists) setView((v) => ({ ...v, selected: last }));
-        }
+        pendingLastCollectionRef.current = s.lastSelectedCollection;
+        settingsLoadedRef.current = true;
       })
       .catch((e) => console.error(e));
   }, []);
+
+  // Restore lastSelectedCollection once, after BOTH settings have loaded AND the
+  // snapshot has at least one collection.  Using snapshot.collections as the
+  // dependency means this re-runs each time the collection list changes until the
+  // one-shot guard (restoredRef) trips.
+  useEffect(() => {
+    if (restoredRef.current) return;
+    if (!settingsLoadedRef.current) return;
+    if (snapshot.collections.length === 0) return;
+
+    // Mark as done before any state write so a re-render can't double-fire.
+    restoredRef.current = true;
+
+    const last = pendingLastCollectionRef.current;
+    if (
+      last &&
+      viewRef.current.selected === ALL_COLLECTION &&
+      snapshot.collections.some((c) => c.name === last)
+    ) {
+      setView((v) => ({ ...v, selected: last }));
+    }
+  }, [snapshot.collections]);
 
   // Apply always-on-top to the window whenever the setting changes (and on mount).
   useEffect(() => {
