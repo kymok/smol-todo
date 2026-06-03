@@ -8,10 +8,11 @@ import {
 import type { ConfirmRequest } from "../state/confirm";
 import {
   clearItems, collectionCliCommand, collectionPromptText, createCollection, createGroup,
-  deleteCollection, deleteGroup, moveCollection, renameCollection, renameGroup,
-  setCollectionArchived, setCollectionColor,
+  deleteCollection, deleteGroup, exportCollection, moveCollection, renameCollection,
+  renameGroup, setCollectionArchived, setCollectionColor,
 } from "../api/client";
 import { copyText } from "../lib/clipboard";
+import { save } from "@tauri-apps/plugin-dialog";
 
 const COLORS: CollectionColor[] = ["gray", "red", "orange", "yellow", "green", "blue", "purple"];
 
@@ -88,6 +89,18 @@ export function Sidebar({
     const v = promptValue.trim();
     if (v && prompt) prompt.submit(v);
     setPrompt(null);
+  };
+
+  const exportAs = (name: string, format: "json" | "jsonl") => {
+    const ext = format; // "json" | "jsonl"
+    save({
+      defaultPath: `${name}.${ext}`,
+      filters: [{ name: format.toUpperCase(), extensions: [ext] }],
+    })
+      .then((path) => {
+        if (path) return exportCollection(name, format, path);
+      })
+      .catch((e) => onError(String(e)));
   };
 
   return (
@@ -227,6 +240,18 @@ export function Sidebar({
                       </ContextMenu.Item>
                       <ContextMenu.Item onSelect={() => clearItems(c.name, true).then(onSnapshot).catch((e) => onError(String(e)))}>
                         Completed Items
+                      </ContextMenu.Item>
+                    </ContextMenu.SubContent>
+                  </ContextMenu.Sub>
+
+                  <ContextMenu.Sub>
+                    <ContextMenu.SubTrigger>Export Collection</ContextMenu.SubTrigger>
+                    <ContextMenu.SubContent>
+                      <ContextMenu.Item onSelect={() => exportAs(c.name, "json")}>
+                        As JSON
+                      </ContextMenu.Item>
+                      <ContextMenu.Item onSelect={() => exportAs(c.name, "jsonl")}>
+                        As JSONL
                       </ContextMenu.Item>
                     </ContextMenu.SubContent>
                   </ContextMenu.Sub>
