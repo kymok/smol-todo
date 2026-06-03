@@ -25,16 +25,22 @@ export interface SidebarProps {
   selected: string;
   showArchived: boolean;
   hideCompleted: boolean;
+  usesAutoDraft: boolean;
+  alwaysOnTop: boolean;
   onSelect: (name: string) => void;
   onToggleHideCompleted: () => void;
   onToggleShowArchived: () => void;
+  onToggleAutoDraft: () => void;
+  onToggleAlwaysOnTop: () => void;
+  onOpenSettings: () => void;
   onSnapshot: (snap: Snapshot) => void;
   onRequestConfirm: (req: ConfirmRequest) => void;
 }
 
 export function Sidebar({
-  snapshot, selected, showArchived, hideCompleted,
-  onSelect, onToggleHideCompleted, onToggleShowArchived, onSnapshot, onRequestConfirm,
+  snapshot, selected, showArchived, hideCompleted, usesAutoDraft, alwaysOnTop,
+  onSelect, onToggleHideCompleted, onToggleShowArchived, onToggleAutoDraft, onToggleAlwaysOnTop,
+  onOpenSettings, onSnapshot, onRequestConfirm,
 }: SidebarProps) {
   const groupNames = snapshot.groups.map((g) => g.name);
 
@@ -238,6 +244,12 @@ export function Sidebar({
             <DropdownMenu.CheckboxItem checked={showArchived} onCheckedChange={onToggleShowArchived}>
               Show Archived
             </DropdownMenu.CheckboxItem>
+            <DropdownMenu.CheckboxItem checked={usesAutoDraft} onCheckedChange={onToggleAutoDraft}>
+              Automatic Drafts
+            </DropdownMenu.CheckboxItem>
+            <DropdownMenu.CheckboxItem checked={alwaysOnTop} onCheckedChange={onToggleAlwaysOnTop}>
+              Always On Top
+            </DropdownMenu.CheckboxItem>
             <DropdownMenu.Separator />
             <DropdownMenu.Item
               onSelect={() =>
@@ -251,6 +263,8 @@ export function Sidebar({
             >
               Add a Group
             </DropdownMenu.Item>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Item onSelect={onOpenSettings}>Settings…</DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu.Root>
       </Flex>

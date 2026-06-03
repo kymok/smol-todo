@@ -36,6 +36,8 @@ export function App() {
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [editingTarget, setEditingTarget] = useState<{ id: string; field: "title" | "note" } | null>(null);
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  void settingsOpen; // consumed by SettingsDialog in Task 7
   const [settings, setSettingsState] = useState<Settings>(DEFAULT_SETTINGS);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
@@ -158,9 +160,14 @@ export function App() {
         selected={view.selected}
         showArchived={view.showArchived}
         hideCompleted={view.hideCompleted}
+        usesAutoDraft={settings.usesAutoDraft}
+        alwaysOnTop={settings.alwaysOnTop}
         onSelect={(name) => setView((v) => ({ ...v, selected: name }))}
         onToggleHideCompleted={() => setView((v) => ({ ...v, hideCompleted: !v.hideCompleted }))}
         onToggleShowArchived={() => setView((v) => ({ ...v, showArchived: !v.showArchived }))}
+        onToggleAutoDraft={() => updateSettings({ usesAutoDraft: !settingsRef.current.usesAutoDraft })}
+        onToggleAlwaysOnTop={() => updateSettings({ alwaysOnTop: !settingsRef.current.alwaysOnTop })}
+        onOpenSettings={() => setSettingsOpen(true)}
         onSnapshot={apply}
         onRequestConfirm={requestConfirm}
       />
