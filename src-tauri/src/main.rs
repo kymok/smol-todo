@@ -3,6 +3,7 @@
 mod commands;
 mod dto;
 mod mutations;
+mod prompt;
 mod settings;
 mod watcher;
 
