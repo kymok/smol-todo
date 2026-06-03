@@ -18,6 +18,12 @@ import { SettingsDialog } from "./components/SettingsDialog";
 import { PromptEditorDialog } from "./components/PromptEditorDialog";
 import { BulkStatusDialog } from "./components/BulkStatusDialog";
 
+// Last path segment of a (posix or windows) absolute path — the dropped file's name.
+function basename(p: string): string {
+  const parts = p.split(/[/\\]/);
+  return parts[parts.length - 1] || p;
+}
+
 const EMPTY: Snapshot = { items: [], collections: [], groups: [] };
 
 const DEFAULT_SETTINGS: Settings = {
@@ -183,6 +189,36 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Drop files onto the window → one Draft per file, titled with the filename.
+  // Target = the selected collection ("All" → default). Mirrors Swift handleFileDrop.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    getCurrentWindow()
+      .onDragDropEvent((event) => {
+        if (event.payload.type !== "drop") return;
+        const paths = event.payload.paths;
+        if (!paths || paths.length === 0) return;
+        const sel = viewRef.current.selected;
+        const target = sel === ALL_COLLECTION ? undefined : sel;
+        // Create sequentially so the final snapshot reflects every new Draft.
+        let chain: Promise<Snapshot> = Promise.resolve(snapRef.current);
+        for (const p of paths) {
+          chain = chain.then(() => createItem(target, basename(p)));
+        }
+        chain.then(setSnapshot).catch((err) => onError(String(err)));
+      })
+      .then((fn) => {
+        if (cancelled) fn();
+        else unlisten = fn;
+      })
+      .catch((e) => console.error(e));
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
   }, []);
 
   const promptInitial =
