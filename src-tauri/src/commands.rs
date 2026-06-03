@@ -1,6 +1,6 @@
 use crate::dto::{CollectionGroupSummaryDto, CollectionSummaryDto, SnapshotDto};
 use crate::mutations;
-use pond_core::{Result, TaskStore};
+use pond_core::{Result, TaskItem, TaskStatus, TaskStore};
 use tauri::State;
 
 /// Build the full read-only snapshot from a store. Testable (no Tauri types).
@@ -31,6 +31,61 @@ pub fn create_item(
     collection: Option<String>,
 ) -> std::result::Result<SnapshotDto, String> {
     mutations::create_item(&store, collection.as_deref()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_item(
+    store: State<TaskStore>,
+    id: String,
+    title: Option<String>,
+    collection: Option<String>,
+    status: Option<TaskStatus>,
+    if_current: Option<TaskItem>,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::update_item(
+        &store,
+        &id,
+        title.as_deref(),
+        collection.as_deref(),
+        status,
+        if_current,
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_status(
+    store: State<TaskStore>,
+    status: TaskStatus,
+    id: String,
+    if_current: Option<TaskItem>,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::set_status(&store, status, &id, if_current).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn move_item(
+    store: State<TaskStore>,
+    id: String,
+    collection: String,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::move_item(&store, &id, &collection).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_item(
+    store: State<TaskStore>,
+    id: String,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::delete_item(&store, &id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_items(
+    store: State<TaskStore>,
+    ids: Vec<String>,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::delete_items(&store, &ids).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

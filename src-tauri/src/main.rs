@@ -13,6 +13,11 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::get_snapshot,
             commands::create_item,
+            commands::update_item,
+            commands::set_status,
+            commands::move_item,
+            commands::delete_item,
+            commands::delete_items,
         ])
         .setup(|app| {
             app.manage(pond_core::TaskStore::open_default());
