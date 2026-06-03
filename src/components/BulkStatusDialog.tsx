@@ -1,0 +1,100 @@
+import { useEffect, useState } from "react";
+import { Button, Dialog, Flex, Select, Text } from "@radix-ui/themes";
+import type { Snapshot, TaskStatus } from "../api/types";
+import { setStatuses } from "../api/client";
+import { presentStatuses } from "../state/bulkStatus";
+
+const STATUS_LABELS: Record<TaskStatus, string> = {
+  draft: "Draft",
+  ready: "Ready",
+  "in-progress": "In Progress",
+  completed: "Completed",
+  "on-hold": "On Hold",
+  rejected: "Rejected",
+  aborted: "Aborted",
+};
+
+const ALL_STATUSES: TaskStatus[] = [
+  "draft", "ready", "in-progress", "completed", "on-hold", "rejected", "aborted",
+];
+
+export interface BulkStatusDialogProps {
+  /** The collection whose statuses are being remapped; null = closed. */
+  collection: string | null;
+  snapshot: Snapshot;
+  onClose: () => void;
+  onSnapshot: (snap: Snapshot) => void;
+  onError: (msg: string) => void;
+}
+
+export function BulkStatusDialog({
+  collection,
+  snapshot,
+  onClose,
+  onSnapshot,
+  onError,
+}: BulkStatusDialogProps) {
+  const rows = collection === null ? [] : presentStatuses(snapshot, collection);
+  // Selection per present status; default = unchanged (the same status).
+  const [selections, setSelections] = useState<Record<string, TaskStatus>>({});
+
+  // Reset selections to "unchanged" whenever the dialog (re)opens for a collection.
+  useEffect(() => {
+    if (collection === null) return;
+    const init: Record<string, TaskStatus> = {};
+    for (const s of presentStatuses(snapshot, collection)) init[s] = s;
+    setSelections(init);
+    // Depend on collection only: opening seeds once; re-seeding on every snapshot
+    // would clobber an in-progress selection.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collection]);
+
+  const confirm = () => {
+    if (collection === null) return;
+    const replacements: Record<string, string> = {};
+    for (const from of rows) {
+      const to = selections[from] ?? from;
+      if (to !== from) replacements[from] = to;
+    }
+    setStatuses(replacements, collection)
+      .then((snap) => { onSnapshot(snap); onClose(); })
+      .catch((e) => onError(String(e)));
+  };
+
+  return (
+    <Dialog.Root open={collection !== null} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <Dialog.Content maxWidth="440px">
+        <Dialog.Title>Change Statuses{collection ? ` — ${collection}` : ""}</Dialog.Title>
+        {rows.length === 0 ? (
+          <Text size="2" color="gray">This collection has no items.</Text>
+        ) : (
+          <Flex direction="column" gap="2" mt="2">
+            {rows.map((from) => (
+              <Flex key={from} align="center" justify="between" gap="3">
+                <Text size="2" style={{ width: 120 }}>{STATUS_LABELS[from]}</Text>
+                <Text size="2" color="gray">→</Text>
+                <Select.Root
+                  value={selections[from] ?? from}
+                  onValueChange={(v) => setSelections((s) => ({ ...s, [from]: v as TaskStatus }))}
+                >
+                  <Select.Trigger />
+                  <Select.Content>
+                    {ALL_STATUSES.map((s) => (
+                      <Select.Item key={s} value={s}>{STATUS_LABELS[s]}</Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Root>
+              </Flex>
+            ))}
+          </Flex>
+        )}
+        <Flex gap="2" mt="4" justify="end">
+          <Dialog.Close>
+            <Button variant="soft" color="gray">Cancel</Button>
+          </Dialog.Close>
+          <Button onClick={confirm} disabled={rows.length === 0}>OK</Button>
+        </Flex>
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+}

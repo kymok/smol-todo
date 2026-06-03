@@ -37,6 +37,7 @@ export interface SidebarProps {
   onToggleAlwaysOnTop: () => void;
   onOpenSettings: () => void;
   onEditPrompt: (name: string) => void;
+  onChangeStatuses: (name: string) => void;
   onSnapshot: (snap: Snapshot) => void;
   onError: (msg: string) => void;
   onRequestConfirm: (req: ConfirmRequest) => void;
@@ -45,7 +46,7 @@ export interface SidebarProps {
 export function Sidebar({
   snapshot, selected, showArchived, hideCompleted, usesAutoDraft, alwaysOnTop,
   onSelect, onToggleHideCompleted, onToggleShowArchived, onToggleAutoDraft, onToggleAlwaysOnTop,
-  onOpenSettings, onEditPrompt, onSnapshot, onError, onRequestConfirm,
+  onOpenSettings, onEditPrompt, onChangeStatuses, onSnapshot, onError, onRequestConfirm,
 }: SidebarProps) {
   const groupNames = snapshot.groups.map((g) => g.name);
 
@@ -255,6 +256,10 @@ export function Sidebar({
                       </ContextMenu.Item>
                     </ContextMenu.SubContent>
                   </ContextMenu.Sub>
+
+                  <ContextMenu.Item onSelect={() => onChangeStatuses(c.name)}>
+                    Change Statuses…
+                  </ContextMenu.Item>
 
                   <ContextMenu.Separator />
                   <ContextMenu.Item

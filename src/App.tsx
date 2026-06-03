@@ -16,6 +16,7 @@ import { Sidebar } from "./components/Sidebar";
 import { DetailPane } from "./components/DetailPane";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { PromptEditorDialog } from "./components/PromptEditorDialog";
+import { BulkStatusDialog } from "./components/BulkStatusDialog";
 
 const EMPTY: Snapshot = { items: [], collections: [], groups: [] };
 
@@ -40,6 +41,7 @@ export function App() {
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [promptCollection, setPromptCollection] = useState<string | null>(null);
+  const [bulkStatusCollection, setBulkStatusCollection] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const onError = useCallback((msg: string) => setErrorMessage(msg), []);
   const [settings, setSettingsState] = useState<Settings>(DEFAULT_SETTINGS);
@@ -204,6 +206,7 @@ export function App() {
         onToggleAlwaysOnTop={() => updateSettings({ alwaysOnTop: !settingsRef.current.alwaysOnTop })}
         onOpenSettings={() => setSettingsOpen(true)}
         onEditPrompt={(name) => setPromptCollection(name)}
+        onChangeStatuses={(name) => setBulkStatusCollection(name)}
         onSnapshot={apply}
         onError={onError}
         onRequestConfirm={requestConfirm}
@@ -234,6 +237,14 @@ export function App() {
         collection={promptCollection}
         initialTemplate={promptInitial}
         onClose={() => setPromptCollection(null)}
+        onSnapshot={apply}
+        onError={onError}
+      />
+
+      <BulkStatusDialog
+        collection={bulkStatusCollection}
+        snapshot={snapshot}
+        onClose={() => setBulkStatusCollection(null)}
         onSnapshot={apply}
         onError={onError}
       />
