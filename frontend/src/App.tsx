@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertDialog, Button, Flex } from "@radix-ui/themes";
+import { AlertDialog } from "@base-ui-components/react/alert-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { Settings, Snapshot } from "./api/types";
 import {
@@ -227,7 +227,7 @@ export function App() {
       : snapshot.collections.find((c) => c.name === promptCollection)?.promptTemplate;
 
   return (
-    <Flex height="100vh">
+    <div style={{ display: "flex", height: "100vh" }}>
       <Sidebar
         snapshot={snapshot}
         selected={view.selected}
@@ -286,39 +286,38 @@ export function App() {
       />
 
       <AlertDialog.Root open={errorMessage !== null} onOpenChange={(o) => { if (!o) setErrorMessage(null); }}>
-        <AlertDialog.Content maxWidth="420px">
-          <AlertDialog.Title>Something went wrong</AlertDialog.Title>
-          <AlertDialog.Description size="2">{errorMessage ?? ""}</AlertDialog.Description>
-          <Flex gap="3" mt="4" justify="end">
-            <AlertDialog.Action>
-              <Button onClick={() => setErrorMessage(null)}>OK</Button>
-            </AlertDialog.Action>
-          </Flex>
-        </AlertDialog.Content>
+        <AlertDialog.Portal>
+          <AlertDialog.Backdrop />
+          <AlertDialog.Popup>
+            <AlertDialog.Title>Something went wrong</AlertDialog.Title>
+            <AlertDialog.Description>{errorMessage ?? ""}</AlertDialog.Description>
+            <div>
+              <button onClick={() => setErrorMessage(null)}>OK</button>
+            </div>
+          </AlertDialog.Popup>
+        </AlertDialog.Portal>
       </AlertDialog.Root>
 
       <AlertDialog.Root open={confirm !== null} onOpenChange={(o) => { if (!o) setConfirm(null); }}>
-        <AlertDialog.Content maxWidth="420px">
-          <AlertDialog.Title>{confirm?.title ?? ""}</AlertDialog.Title>
-          <AlertDialog.Description size="2">{confirm?.description ?? ""}</AlertDialog.Description>
-          <Flex gap="3" mt="4" justify="end">
-            <AlertDialog.Cancel>
-              <Button variant="soft" color="gray">Cancel</Button>
-            </AlertDialog.Cancel>
-            <AlertDialog.Action>
-              <Button
-                color="red"
+        <AlertDialog.Portal>
+          <AlertDialog.Backdrop />
+          <AlertDialog.Popup>
+            <AlertDialog.Title>{confirm?.title ?? ""}</AlertDialog.Title>
+            <AlertDialog.Description>{confirm?.description ?? ""}</AlertDialog.Description>
+            <div>
+              <AlertDialog.Close>Cancel</AlertDialog.Close>
+              <button
                 onClick={() => {
                   confirm?.onConfirm();
                   setConfirm(null);
                 }}
               >
                 {confirm?.confirmLabel ?? "Delete"}
-              </Button>
-            </AlertDialog.Action>
-          </Flex>
-        </AlertDialog.Content>
+              </button>
+            </div>
+          </AlertDialog.Popup>
+        </AlertDialog.Portal>
       </AlertDialog.Root>
-    </Flex>
+    </div>
   );
 }

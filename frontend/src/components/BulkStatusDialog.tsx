@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Button, Dialog, Flex, Select, Text } from "@radix-ui/themes";
+import { Dialog } from "@base-ui-components/react/dialog";
+import { Select } from "@base-ui-components/react/select";
 import type { Snapshot, TaskStatus } from "../api/types";
 import { setStatuses } from "../api/client";
 import { presentStatuses } from "../state/bulkStatus";
@@ -63,38 +64,47 @@ export function BulkStatusDialog({
 
   return (
     <Dialog.Root open={collection !== null} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <Dialog.Content maxWidth="440px">
-        <Dialog.Title>Change Statuses{collection ? ` — ${collection}` : ""}</Dialog.Title>
-        {rows.length === 0 ? (
-          <Text size="2" color="gray">This collection has no items.</Text>
-        ) : (
-          <Flex direction="column" gap="2" mt="2">
-            {rows.map((from) => (
-              <Flex key={from} align="center" justify="between" gap="3">
-                <Text size="2" style={{ width: 120 }}>{STATUS_LABELS[from]}</Text>
-                <Text size="2" color="gray">→</Text>
-                <Select.Root
-                  value={selections[from] ?? from}
-                  onValueChange={(v) => setSelections((s) => ({ ...s, [from]: v as TaskStatus }))}
-                >
-                  <Select.Trigger />
-                  <Select.Content>
-                    {ALL_STATUSES.map((s) => (
-                      <Select.Item key={s} value={s}>{STATUS_LABELS[s]}</Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Root>
-              </Flex>
-            ))}
-          </Flex>
-        )}
-        <Flex gap="2" mt="4" justify="end">
-          <Dialog.Close>
-            <Button variant="soft" color="gray">Cancel</Button>
-          </Dialog.Close>
-          <Button onClick={confirm} disabled={rows.length === 0}>OK</Button>
-        </Flex>
-      </Dialog.Content>
+      <Dialog.Portal>
+        <Dialog.Backdrop />
+        <Dialog.Popup>
+          <Dialog.Title>Change Statuses{collection ? ` — ${collection}` : ""}</Dialog.Title>
+          {rows.length === 0 ? (
+            <span>This collection has no items.</span>
+          ) : (
+            <div>
+              {rows.map((from) => (
+                <div key={from}>
+                  <span>{STATUS_LABELS[from]}</span>
+                  <span>→</span>
+                  <Select.Root
+                    value={selections[from] ?? from}
+                    onValueChange={(v) => setSelections((s) => ({ ...s, [from]: v as TaskStatus }))}
+                  >
+                    <Select.Trigger>
+                      <Select.Value />
+                    </Select.Trigger>
+                    <Select.Portal>
+                      <Select.Positioner>
+                        <Select.Popup>
+                          {ALL_STATUSES.map((s) => (
+                            <Select.Item key={s} value={s}>
+                              <Select.ItemText>{STATUS_LABELS[s]}</Select.ItemText>
+                            </Select.Item>
+                          ))}
+                        </Select.Popup>
+                      </Select.Positioner>
+                    </Select.Portal>
+                  </Select.Root>
+                </div>
+              ))}
+            </div>
+          )}
+          <div>
+            <Dialog.Close>Cancel</Dialog.Close>
+            <button onClick={confirm} disabled={rows.length === 0}>OK</button>
+          </div>
+        </Dialog.Popup>
+      </Dialog.Portal>
     </Dialog.Root>
   );
 }

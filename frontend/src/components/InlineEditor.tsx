@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Text, TextArea } from "@radix-ui/themes";
 import type { Snapshot, TaskItem } from "../api/types";
 import {
   addNote,
@@ -224,23 +223,20 @@ export function InlineEditor({
     if (field === "note" && !item.note) return null;
     const dim = field === "title" && (item.status === "completed" || item.status === "in-progress");
     return (
-      <Text
-        size={field === "title" ? "2" : "1"}
-        color={field === "title" ? (dim ? "gray" : undefined) : "gray"}
+      <span
         onClick={() => {
           if (!locked) onBeginEdit();
         }}
-        style={{ cursor: locked ? "default" : "text" }}
+        style={{ cursor: locked ? "default" : "text", opacity: dim ? 0.5 : undefined }}
       >
         {display}
-      </Text>
+      </span>
     );
   }
 
   return (
-    <TextArea
+    <textarea
       ref={ref}
-      size={field === "title" ? "2" : "1"}
       autoFocus
       value={draft}
       rows={1}

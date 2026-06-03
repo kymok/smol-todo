@@ -1,5 +1,6 @@
-import { Button, Flex, Heading, ScrollArea, TextField } from "@radix-ui/themes";
-import { MagnifyingGlassIcon, PlusIcon } from "@radix-ui/react-icons";
+import { ScrollArea } from "@base-ui-components/react/scroll-area";
+import { Input } from "@base-ui-components/react/input";
+import { Search, Plus } from "lucide-react";
 import type { Snapshot } from "../api/types";
 import type { ConfirmRequest } from "../state/confirm";
 import { ALL_COLLECTION, visibleItems, type ViewState } from "../state/view";
@@ -60,18 +61,17 @@ export function DetailPane({
   };
 
   return (
-    <Flex direction="column" flexGrow="1" p="3" gap="3">
-      <Flex align="center" justify="between">
-        <Heading size="4">{title}</Heading>
-        <Flex align="center" gap="2">
-          <TextField.Root placeholder="Search" value={view.search} onChange={(e) => onSearch(e.target.value)}>
-            <TextField.Slot><MagnifyingGlassIcon /></TextField.Slot>
-          </TextField.Root>
-          <Button onClick={newTask}><PlusIcon /> New Task</Button>
-        </Flex>
-      </Flex>
-      <ScrollArea>
-        <Flex direction="column">
+    <div style={{ flexGrow: 1 }}>
+      <div data-tauri-drag-region>
+        <h2>{title}</h2>
+        <div>
+          <Search />
+          <Input placeholder="Search" value={view.search} onChange={(e) => onSearch(e.target.value)} />
+          <button onClick={newTask}><Plus /> New Task</button>
+        </div>
+      </div>
+      <ScrollArea.Root>
+        <ScrollArea.Viewport>
           {items.map((item, i) => (
             <TaskRow
               key={item.id}
@@ -91,8 +91,11 @@ export function DetailPane({
               onError={onError}
             />
           ))}
-        </Flex>
-      </ScrollArea>
-    </Flex>
+        </ScrollArea.Viewport>
+        <ScrollArea.Scrollbar>
+          <ScrollArea.Thumb />
+        </ScrollArea.Scrollbar>
+      </ScrollArea.Root>
+    </div>
   );
 }

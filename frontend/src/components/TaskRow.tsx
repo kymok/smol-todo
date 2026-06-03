@@ -1,5 +1,5 @@
-import { ContextMenu, Flex, Text } from "@radix-ui/themes";
-import { DotFilledIcon } from "@radix-ui/react-icons";
+import { ContextMenu } from "@base-ui-components/react/context-menu";
+import { Circle } from "lucide-react";
 import type { CollectionColor, CollectionSummary, Snapshot, TaskItem, TaskStatus } from "../api/types";
 import { setStatus, moveItem, deleteItem } from "../api/client";
 import { leadingStatusClickTarget, rightClickStatusTarget } from "../state/status";
@@ -50,23 +50,19 @@ export function TaskRow({
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger>
-        <Flex
-          align="start"
-          gap="2"
-          py="1"
+        <div
           onClick={onFocus}
-          style={{ background: focused ? "var(--accent-3)" : undefined, borderRadius: 4 }}
+          style={{ background: focused ? "#e0e0e0" : undefined, borderRadius: 4 }}
         >
-          <Text
-            color={STATUS_COLOR[item.status]}
+          <span
+            style={{ color: STATUS_COLOR[item.status], cursor: "pointer" }}
             onClick={advance}
             onContextMenu={toDraft}
-            style={{ cursor: "pointer" }}
             title={item.status}
           >
-            <DotFilledIcon />
-          </Text>
-          <Flex direction="column" flexGrow="1">
+            <Circle size={12} fill="currentColor" />
+          </span>
+          <div>
             <InlineEditor
               item={item}
               field="title"
@@ -90,59 +86,70 @@ export function TaskRow({
               onSnapshot={onSnapshot}
               onError={onError}
             />
-          </Flex>
+          </div>
           {showCollection ? (
-            <Text size="1" color="gray">{item.collection}</Text>
+            <span>{item.collection}</span>
           ) : null}
-        </Flex>
+        </div>
       </ContextMenu.Trigger>
 
-      <ContextMenu.Content>
-        <ContextMenu.Sub>
-          <ContextMenu.SubTrigger>Status</ContextMenu.SubTrigger>
-          <ContextMenu.SubContent>
-            {ALL_STATUSES.map((s) => (
-              <ContextMenu.Item
-                key={s}
-                onSelect={() =>
-                  setStatus(s, item.id, item).then(onSnapshot).catch((e) => onError(String(e)))
-                }
-              >
-                {s}
-              </ContextMenu.Item>
-            ))}
-          </ContextMenu.SubContent>
-        </ContextMenu.Sub>
+      <ContextMenu.Portal>
+        <ContextMenu.Positioner>
+          <ContextMenu.Popup>
+            <ContextMenu.SubmenuRoot>
+              <ContextMenu.SubmenuTrigger>Status</ContextMenu.SubmenuTrigger>
+              <ContextMenu.Portal>
+                <ContextMenu.Positioner>
+                  <ContextMenu.Popup>
+                    {ALL_STATUSES.map((s) => (
+                      <ContextMenu.Item
+                        key={s}
+                        onClick={() =>
+                          setStatus(s, item.id, item).then(onSnapshot).catch((e) => onError(String(e)))
+                        }
+                      >
+                        {s}
+                      </ContextMenu.Item>
+                    ))}
+                  </ContextMenu.Popup>
+                </ContextMenu.Positioner>
+              </ContextMenu.Portal>
+            </ContextMenu.SubmenuRoot>
 
-        <ContextMenu.Sub>
-          <ContextMenu.SubTrigger>Move to Collection</ContextMenu.SubTrigger>
-          <ContextMenu.SubContent>
-            {collections.map((c) => (
-              <ContextMenu.Item
-                key={c.name}
-                disabled={c.name === item.collection}
-                onSelect={() => moveItem(item.id, c.name).then(onSnapshot).catch((e) => onError(String(e)))}
-              >
-                {c.displayName}
-              </ContextMenu.Item>
-            ))}
-          </ContextMenu.SubContent>
-        </ContextMenu.Sub>
+            <ContextMenu.SubmenuRoot>
+              <ContextMenu.SubmenuTrigger>Move to Collection</ContextMenu.SubmenuTrigger>
+              <ContextMenu.Portal>
+                <ContextMenu.Positioner>
+                  <ContextMenu.Popup>
+                    {collections.map((c) => (
+                      <ContextMenu.Item
+                        key={c.name}
+                        disabled={c.name === item.collection}
+                        onClick={() => moveItem(item.id, c.name).then(onSnapshot).catch((e) => onError(String(e)))}
+                      >
+                        {c.displayName}
+                      </ContextMenu.Item>
+                    ))}
+                  </ContextMenu.Popup>
+                </ContextMenu.Positioner>
+              </ContextMenu.Portal>
+            </ContextMenu.SubmenuRoot>
 
-        <ContextMenu.Item
-          onSelect={() => copyText(item.id).catch((e) => onError(String(e)))}
-        >
-          Copy ID
-        </ContextMenu.Item>
+            <ContextMenu.Item
+              onClick={() => copyText(item.id).catch((e) => onError(String(e)))}
+            >
+              Copy ID
+            </ContextMenu.Item>
 
-        <ContextMenu.Separator />
-        <ContextMenu.Item
-          color="red"
-          onSelect={() => deleteItem(item.id).then(onSnapshot).catch((e) => onError(String(e)))}
-        >
-          Delete
-        </ContextMenu.Item>
-      </ContextMenu.Content>
+            <ContextMenu.Separator />
+            <ContextMenu.Item
+              onClick={() => deleteItem(item.id).then(onSnapshot).catch((e) => onError(String(e)))}
+            >
+              Delete
+            </ContextMenu.Item>
+          </ContextMenu.Popup>
+        </ContextMenu.Positioner>
+      </ContextMenu.Portal>
     </ContextMenu.Root>
   );
 }

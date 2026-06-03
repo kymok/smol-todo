@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Dialog, Flex, Text, TextArea } from "@radix-ui/themes";
+import { Dialog } from "@base-ui-components/react/dialog";
 import type { Snapshot } from "../api/types";
 import { setCollectionPrompt } from "../api/client";
 
@@ -41,24 +41,23 @@ export function PromptEditorDialog({
 
   return (
     <Dialog.Root open={collection !== null} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <Dialog.Content maxWidth="560px">
-        <Dialog.Title>Edit Prompt{collection ? ` — ${collection}` : ""}</Dialog.Title>
-        <TextArea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Prompt template…"
-          rows={10}
-        />
-        <Text size="1" color="gray" mt="2" as="p">
-          Leave empty to use the app default prompt.
-        </Text>
-        <Flex gap="2" mt="3" justify="end">
-          <Dialog.Close>
-            <Button variant="soft" color="gray">Cancel</Button>
-          </Dialog.Close>
-          <Button onClick={save}>Save</Button>
-        </Flex>
-      </Dialog.Content>
+      <Dialog.Portal>
+        <Dialog.Backdrop />
+        <Dialog.Popup>
+          <Dialog.Title>Edit Prompt{collection ? ` — ${collection}` : ""}</Dialog.Title>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Prompt template…"
+            rows={10}
+          />
+          <p>Leave empty to use the app default prompt.</p>
+          <div>
+            <Dialog.Close>Cancel</Dialog.Close>
+            <button onClick={save}>Save</button>
+          </div>
+        </Dialog.Popup>
+      </Dialog.Portal>
     </Dialog.Root>
   );
 }

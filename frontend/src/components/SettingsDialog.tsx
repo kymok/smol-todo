@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Button, Code, Dialog, Flex, IconButton, Link, Tabs, Text, TextArea } from "@radix-ui/themes";
-import { CopyIcon } from "@radix-ui/react-icons";
+import { Dialog } from "@base-ui-components/react/dialog";
+import { Tabs } from "@base-ui-components/react/tabs";
+import { Copy } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
 import { cliInstall, cliInstallStatus, cliUninstall, storePath } from "../api/client";
 import { copyText } from "../lib/clipboard";
@@ -59,103 +60,98 @@ export function SettingsDialog({ open, onOpenChange, settings, updateSettings }:
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Content maxWidth="520px">
-        <Dialog.Title>Settings</Dialog.Title>
-        <Tabs.Root defaultValue="system">
-          <Tabs.List>
-            <Tabs.Trigger value="system">System Information</Tabs.Trigger>
-            <Tabs.Trigger value="prompt">Prompt</Tabs.Trigger>
-            <Tabs.Trigger value="command">Command</Tabs.Trigger>
-          </Tabs.List>
-          <Tabs.Content value="system">
-            <Flex direction="column" gap="3" mt="3">
-              <Flex justify="between" gap="4">
-                <Text size="2" color="gray">Version</Text>
-                <Text size="2">{version || "Unavailable"}</Text>
-              </Flex>
-              <Flex direction="column" gap="1">
-                <Text size="2" color="gray">Store Path</Text>
-                <Text size="1" style={{ wordBreak: "break-all" }}>{path || "Unavailable"}</Text>
-              </Flex>
-            </Flex>
-          </Tabs.Content>
-          <Tabs.Content value="prompt">
-            <Flex direction="column" gap="2" mt="3">
-              <Text size="2" color="gray">Default prompt template</Text>
-              <TextArea
-                value={promptDraft}
-                onChange={(e) => setPromptDraft(e.target.value)}
-                placeholder="Default prompt template…"
-                rows={10}
-              />
-              <Text size="1" color="gray">
-                Leave empty to use the built-in default. Collections without their own
-                prompt use this template.
-              </Text>
-              <Flex justify="end">
-                <Button onClick={() => updateSettings({ defaultPromptTemplate: promptDraft })}>
-                  Save
-                </Button>
-              </Flex>
-            </Flex>
-          </Tabs.Content>
-          <Tabs.Content value="command">
-            <Flex direction="column" gap="3" mt="3">
-              {installStatus ? (
-                <>
-                  <Flex direction="column" gap="1">
-                    <Text size="2" color="gray">Link</Text>
-                    <Link size="1" style={{ wordBreak: "break-all" }}>{installStatus.linkPath}</Link>
-                  </Flex>
-                  <Flex direction="column" gap="1">
-                    <Text size="2" color="gray">Status</Text>
-                    <Text size="2" color={installStatus.installed ? "green" : "gray"}>
-                      {statusText(installStatus)}
-                    </Text>
-                  </Flex>
-                  {!installStatus.installDirectoryIsInPath && (
-                    <Flex direction="column" gap="1">
-                      <Text size="2" color="gray">Add to PATH</Text>
-                      <Flex align="center" gap="2">
-                        <Code size="1" style={{ wordBreak: "break-all" }}>{installStatus.pathHint}</Code>
-                        <IconButton
-                          size="1"
-                          variant="soft"
-                          aria-label="Copy PATH command"
-                          onClick={() => copyText(installStatus.pathHint).catch((e) => setInstallError(String(e)))}
-                        >
-                          <CopyIcon />
-                        </IconButton>
-                      </Flex>
-                    </Flex>
-                  )}
-                  {installError && <Text size="1" color="red">{installError}</Text>}
-                  <Flex gap="2" justify="end">
-                    <Button
-                      color="red"
-                      variant="soft"
-                      disabled={!installStatus.canUninstall}
-                      onClick={runUninstall}
-                    >
-                      Uninstall
-                    </Button>
-                    <Button
-                      disabled={!installStatus.installed && !installStatus.canInstall}
-                      onClick={runInstall}
-                    >
-                      {installStatus.installed ? "Reinstall" : "Install"}
-                    </Button>
-                  </Flex>
-                </>
-              ) : (
-                <Text size="2" color={installError ? "red" : "gray"}>
-                  {installError ?? "Loading…"}
-                </Text>
-              )}
-            </Flex>
-          </Tabs.Content>
-        </Tabs.Root>
-      </Dialog.Content>
+      <Dialog.Portal>
+        <Dialog.Backdrop />
+        <Dialog.Popup>
+          <Dialog.Title>Settings</Dialog.Title>
+          <Tabs.Root defaultValue="system">
+            <Tabs.List>
+              <Tabs.Tab value="system">System Information</Tabs.Tab>
+              <Tabs.Tab value="prompt">Prompt</Tabs.Tab>
+              <Tabs.Tab value="command">Command</Tabs.Tab>
+            </Tabs.List>
+            <Tabs.Panel value="system">
+              <div>
+                <div>
+                  <span>Version</span>
+                  <span>{version || "Unavailable"}</span>
+                </div>
+                <div>
+                  <span>Store Path</span>
+                  <span style={{ wordBreak: "break-all" }}>{path || "Unavailable"}</span>
+                </div>
+              </div>
+            </Tabs.Panel>
+            <Tabs.Panel value="prompt">
+              <div>
+                <span>Default prompt template</span>
+                <textarea
+                  value={promptDraft}
+                  onChange={(e) => setPromptDraft(e.target.value)}
+                  placeholder="Default prompt template…"
+                  rows={10}
+                />
+                <span>
+                  Leave empty to use the built-in default. Collections without their own
+                  prompt use this template.
+                </span>
+                <div>
+                  <button onClick={() => updateSettings({ defaultPromptTemplate: promptDraft })}>
+                    Save
+                  </button>
+                </div>
+              </div>
+            </Tabs.Panel>
+            <Tabs.Panel value="command">
+              <div>
+                {installStatus ? (
+                  <>
+                    <div>
+                      <span>Link</span>
+                      <a style={{ wordBreak: "break-all" }}>{installStatus.linkPath}</a>
+                    </div>
+                    <div>
+                      <span>Status</span>
+                      <span>{statusText(installStatus)}</span>
+                    </div>
+                    {!installStatus.installDirectoryIsInPath && (
+                      <div>
+                        <span>Add to PATH</span>
+                        <div>
+                          <code style={{ wordBreak: "break-all" }}>{installStatus.pathHint}</code>
+                          <button
+                            aria-label="Copy PATH command"
+                            onClick={() => copyText(installStatus.pathHint).catch((e) => setInstallError(String(e)))}
+                          >
+                            <Copy />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {installError && <span>{installError}</span>}
+                    <div>
+                      <button
+                        disabled={!installStatus.canUninstall}
+                        onClick={runUninstall}
+                      >
+                        Uninstall
+                      </button>
+                      <button
+                        disabled={!installStatus.installed && !installStatus.canInstall}
+                        onClick={runInstall}
+                      >
+                        {installStatus.installed ? "Reinstall" : "Install"}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <span>{installError ?? "Loading…"}</span>
+                )}
+              </div>
+            </Tabs.Panel>
+          </Tabs.Root>
+        </Dialog.Popup>
+      </Dialog.Portal>
     </Dialog.Root>
   );
 }
