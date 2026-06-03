@@ -6,6 +6,8 @@ export interface ViewState {
   selected: string; // ALL_COLLECTION or a collection name
   search: string;
   incompleteOnly: boolean;
+  hideCompleted: boolean;
+  showArchived: boolean;
 }
 
 function matchesSearch(item: TaskItem, query: string): boolean {
@@ -22,8 +24,8 @@ function matchesSearch(item: TaskItem, query: string): boolean {
 export function visibleItems(snapshot: Snapshot, view: ViewState): TaskItem[] {
   return snapshot.items.filter((item) => {
     const collectionMatches = view.selected === ALL_COLLECTION || item.collection === view.selected;
-    const statusMatches = !view.incompleteOnly || item.status !== "completed";
-    return collectionMatches && statusMatches && matchesSearch(item, view.search);
+    const completedHidden = (view.incompleteOnly || view.hideCompleted) && item.status === "completed";
+    return collectionMatches && !completedHidden && matchesSearch(item, view.search);
   });
 }
 

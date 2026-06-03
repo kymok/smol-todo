@@ -10,7 +10,7 @@ const EMPTY: Snapshot = { items: [], collections: [], groups: [] };
 
 export function App() {
   const [snapshot, setSnapshot] = useState<Snapshot>(EMPTY);
-  const [view, setView] = useState<ViewState>({ selected: ALL_COLLECTION, search: "", incompleteOnly: false });
+  const [view, setView] = useState<ViewState>({ selected: ALL_COLLECTION, search: "", incompleteOnly: false, hideCompleted: false, showArchived: false });
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
