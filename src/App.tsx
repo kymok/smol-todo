@@ -14,6 +14,7 @@ import { ALL_COLLECTION, type ViewState } from "./state/view";
 import type { ConfirmRequest } from "./state/confirm";
 import { Sidebar } from "./components/Sidebar";
 import { DetailPane } from "./components/DetailPane";
+import { SettingsDialog } from "./components/SettingsDialog";
 
 const EMPTY: Snapshot = { items: [], collections: [], groups: [] };
 
@@ -37,7 +38,6 @@ export function App() {
   const [editingTarget, setEditingTarget] = useState<{ id: string; field: "title" | "note" } | null>(null);
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  void settingsOpen; // consumed by SettingsDialog in Task 7
   const [settings, setSettingsState] = useState<Settings>(DEFAULT_SETTINGS);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
@@ -184,6 +184,8 @@ export function App() {
         onSnapshot={apply}
         onRequestConfirm={requestConfirm}
       />
+
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
 
       <AlertDialog.Root open={confirm !== null} onOpenChange={(o) => { if (!o) setConfirm(null); }}>
         <AlertDialog.Content maxWidth="420px">
