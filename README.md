@@ -2,27 +2,36 @@
 
 # Pond
 
-A small macOS task app with a shared command line interface.
+A small macOS task app (Tauri + React + Radix Themes) with a shared `taskpond`
+command-line interface. The GUI and the CLI use the same on-disk JSON store, so an edit
+from either side shows up live in the other.
 
-## Build
+## Desktop app
 
-```sh
-xcodebuild -project Pond.xcodeproj -scheme Pond -configuration Debug build
-```
-
-To create the macOS app bundle:
-
-```sh
-./Scripts/package-app.sh
-```
-
-The app bundle is written to `dist/Pond.app`.
-
-To create a bundle with explicit release metadata:
+Prerequisites: the pinned Rust toolchain (installed automatically from `rust-toolchain.toml`),
+Node + npm, and the Tauri CLI.
 
 ```sh
-./Scripts/package-app.sh --version 0.1.0 --build 0.1.0.123
+cargo install tauri-cli --version "^2"   # once (or use: npx @tauri-apps/cli)
+npm install
+cargo tauri dev                          # launch with hot-reload against the Vite dev server
 ```
+
+- **Dev (hot-reload):** `cargo tauri dev`.
+- **Bundle:** `cargo tauri build` — produces the `.app`, with the `taskpond` CLI bundled
+  alongside the executable as a sidecar.
+
+The window supports full editing: create, rename, delete, status changes, notes, inline
+title/note editing (split/merge), collection and group management, per-collection prompts,
+export, and file-drop-to-create. Edits made by the `taskpond` CLI appear live via the file
+watcher. The store path honors `POND_STORE`.
+
+**Keyboard shortcuts:**
+- `Cmd+N` — create a new task in the selected collection.
+- `Cmd+Backspace` — delete the focused task.
+- `Enter` (in title editor) — split at caret; `Cmd+Enter` — confirm title.
+- `Backspace` at start of a title — merge into the previous task (if it is a note-free draft or ready task).
+- `Esc` — discard edits.
 
 ## CLI
 
@@ -42,27 +51,28 @@ taskpond collection delete <name>
 taskpond collection clear <name> [--completed]
 ```
 
-`taskpond item update --status` requires one status: `ready`, `draft`, `in-progress`, `completed`, `on-hold`, or `aborted`.
+`taskpond item update --status` requires one status: `ready`, `draft`, `in-progress`,
+`completed`, `on-hold`, `rejected`, or `aborted`.
 `taskpond item update` changes an existing item in place without changing its id.
-Successful non-help CLI commands write JSON to standard output. Item output includes `id`, `status`, `collection`, and `title`.
-Collections outside `No Group` are addressed as `<group>/<collection>`.
-The default GUI collection `Inbox` is addressed as `DefaultCollection` in CLI/API output; `Inbox` is still accepted as a legacy alias.
+Successful non-help CLI commands write JSON to standard output. Item output includes `id`,
+`status`, `collection`, `title`, and an optional `note`.
+The default collection is `Inbox`. Collections outside the default group (`No Group`) are
+addressed as `<group>/<collection>`.
 
 Examples:
 
 ```sh
-taskpond item create --collection DefaultCollection "Buy milk"
+taskpond item create "Buy milk"
 taskpond item create --collection Projects/Work "Draft proposal"
 taskpond item get
-taskpond item get -s ready -c DefaultCollection
+taskpond item get -s ready -c Inbox
 taskpond item update 1a2b3c4d --collection Errands -s ready "Buy oat milk"
 taskpond item update 1a2b3c4d --status completed
-taskpond item update 1a2b3c4d --status draft
 taskpond item update 1a2b3c4d --status in-progress
 taskpond item update 1a2b3c4d --status on-hold
 taskpond item update 1a2b3c4d --status aborted
 taskpond item delete 1a2b3c4d
-taskpond item delete --collection DefaultCollection
+taskpond item delete --collection Inbox
 taskpond collection list
 taskpond collection create Errands
 taskpond collection rename Errands Personal
@@ -71,36 +81,35 @@ taskpond collection clear Personal --completed
 taskpond collection delete Personal
 ```
 
-The GUI settings window can install a `taskpond` symlink into `~/.local/bin/taskpond`. For a packaged `.app`, place the CLI binary at:
+The desktop app's **Settings → Command** tab installs a `taskpond` symlink at
+`~/.local/bin/taskpond` pointing at the CLI bundled alongside the app, and shows a
+`PATH` hint when `~/.local/bin` is not on your `PATH`.
+
+## Toolchain
+
+- **Rust 1.96.0** — pinned in `rust-toolchain.toml` (rustup installs it automatically for this repo; the global default is untouched). Crates use edition 2021.
+- **Tauri v2** — `tauri` / `tauri-build` 2.x, plus the `clipboard-manager` and `dialog` plugins. Install the CLI once: `cargo install tauri-cli --version "^2"` (or use `npx @tauri-apps/cli`).
+- **Frontend** — Node with **npm**; Vite 5, React 18, TypeScript 5, `@radix-ui/themes` 3, `@tauri-apps/api` 2; logic tests via Vitest 2.
+- `taskpond` ships as a Tauri **sidecar** (`externalBin`); `Scripts/build-sidecar.mjs` builds it and stages `src-tauri/binaries/taskpond-<target-triple>` before `cargo tauri dev`/`build`.
+
+## Workspace layout
 
 ```text
-Pond.app/Contents/Library/Helpers/taskpond
+crates/pond-core      data store + domain logic (also hosts the macOS `cli_install` module)
+crates/taskpond-cli   the `taskpond` CLI binary (clap)
+src-tauri/            the Tauri app: Rust commands over pond-core + the file watcher
+src/                  the React + Radix Themes frontend
 ```
 
-## Rust workspace (migration in progress)
+Tests: `cargo test` (Rust workspace) and `npm test` (frontend logic, Vitest). Run the CLI
+directly with `cargo run -p taskpond-cli -- item get`. The store path honors `POND_STORE`.
 
-The Tauri rewrite lives in `crates/`:
+## Legacy SwiftUI app
 
-- `pond-core` — the data store + domain logic (also hosts the macOS `cli_install` module).
-- `taskpond-cli` — the `taskpond` CLI binary.
+The original SwiftUI implementation remains under `Sources/` as the behavioral reference for
+the Tauri port. To build it:
 
-Build/test: `cargo test`. Run the CLI: `cargo run -p taskpond-cli -- item get`.
-The store path honors `POND_STORE`.
-
-### Run the desktop app (Tauri)
-
-Install the Tauri CLI once: `cargo install tauri-cli --version "^2"` (or use `npx @tauri-apps/cli`).
-
-- Dev (hot-reload): `cargo tauri dev` — launches the window against the Vite dev server.
-- The window supports full editing: create, rename, delete, status changes, notes, inline title/note editing, collection and group management.
-- Edits made by `taskpond` (the CLI) also appear live via the file watcher.
-- The store path honors `POND_STORE`.
-
-**Keyboard shortcuts:**
-- `Cmd+N` — create a new task in the selected collection.
-- `Cmd+Backspace` — delete the focused task.
-- `Enter` (in title editor) — split at caret; `Cmd+Enter` — confirm title.
-- `Backspace` at start of a title — merge into the previous task (if it is a note-free draft or ready task).
-- `Esc` — discard edits.
-
-Frontend-only checks: `npm test` (Vitest), `npm run build` (typecheck + bundle).
+```sh
+xcodebuild -project Pond.xcodeproj -scheme Pond -configuration Debug build
+./Scripts/package-app.sh   # package a macOS .app bundle to dist/Pond.app
+```
