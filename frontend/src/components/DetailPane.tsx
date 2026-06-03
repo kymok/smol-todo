@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ScrollArea } from "@base-ui-components/react/scroll-area";
 import type { Snapshot } from "../api/types";
 import type { ConfirmRequest } from "../state/confirm";
@@ -26,6 +27,7 @@ export function DetailPane({
   snapshot, view, focusedId, editingTarget, usesAutoDraft,
   onFocusItem, onEdit, onEndEdit, onSnapshot, onError,
 }: DetailPaneProps) {
+  const [scrolled, setScrolled] = useState(false);
   const items = visibleItems(snapshot, view);
   const title = view.selected === ALL_COLLECTION
     ? "All"
@@ -46,12 +48,19 @@ export function DetailPane({
 
   return (
     <DetailContainer>
-      {/* Title bar: collection title vertically centered in the title-bar-height strip. */}
-      <div className="flex shrink-0 items-center" style={{ height: TITLE_BAR_HEIGHT }}>
+      {/* Title bar: collection title vertically centered in the title-bar-height
+          strip. A bottom border fades in (animated) only once the list is scrolled. */}
+      <div
+        className={`flex shrink-0 items-center border-b transition-colors ${scrolled ? "border-neutral-50" : "border-transparent"}`}
+        style={{ height: TITLE_BAR_HEIGHT }}
+      >
         <h2>{title}</h2>
       </div>
       <ScrollArea.Root className="min-h-0 flex-1">
-        <ScrollArea.Viewport className="h-full">
+        <ScrollArea.Viewport
+          className="h-full"
+          onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 0)}
+        >
           {items.map((item, i) => (
             <TaskRow
               key={item.id}

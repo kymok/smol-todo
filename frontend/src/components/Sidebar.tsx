@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Accordion } from "@base-ui-components/react/accordion";
 import { ContextMenu } from "@base-ui-components/react/context-menu";
 import { Dialog } from "@base-ui-components/react/dialog";
@@ -85,6 +85,21 @@ export interface SidebarProps {
   onRequestConfirm: (req: ConfirmRequest) => void;
 }
 
+// The "All" row: a fixed sidebar header, separate from the scrollable groups.
+function AllRow({ selected, count, onSelect }: { selected: boolean; count: number; onSelect: () => void }) {
+  return (
+    <button
+      aria-current={selected}
+      onClick={onSelect}
+      className={`group flex items-center gap-2 py-2 -mt-2 text-sm text-neutral-600 ${SIDEBAR_ROW_CLASS}`}
+    >
+      <span className="text-neutral-600 shrink-0 transition-colors group-aria-[current=true]:text-sky-600"><CircleSmall size={16} /></span>
+      <span className="flex-1 min-w-0 font-normal text-left truncate">All</span>
+      {count > 0 && <span className="shrink-0 text-xs text-neutral-500 transition-colors group-aria-[current=true]:text-sky-500">{count}</span>}
+    </button>
+  );
+}
+
 export function Sidebar({
   snapshot, selected, showArchived, hideCompleted, usesAutoDraft, alwaysOnTop,
   minWidth = DEFAULT_MIN_WIDTH, maxWidth = DEFAULT_MAX_WIDTH,
@@ -105,19 +120,6 @@ export function Sidebar({
     setClosedGroups(visibleGroups.map((g) => g.name).filter((name) => !open.includes(name)));
   };
 
-  // Group headers stick just below the sticky "All" header, so their `top` must
-  // equal the All header's height. Measure it (and track padding/font changes).
-  const allHeaderRef = useRef<HTMLDivElement>(null);
-  const [groupStickyTop, setGroupStickyTop] = useState(0);
-  useLayoutEffect(() => {
-    const el = allHeaderRef.current;
-    if (!el) return;
-    const update = () => setGroupStickyTop(el.offsetHeight);
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
 
   const [width, setWidth] = useState(() => clamp(DEFAULT_WIDTH, minWidth, maxWidth));
   const [dragging, setDragging] = useState(false);
@@ -223,22 +225,10 @@ export function Sidebar({
         </Dialog.Portal>
       </Dialog.Root>
 
-      <SidebarContainer width={width}>
-        {/* Sticky header: All plus the gap below it stays pinned while the groups
-            scroll under it. bg matches the (white) sidebar canvas so scrolled rows
-            are masked; pb-2 is the fixed gap. */}
-        <div ref={allHeaderRef} className="sticky top-0 z-10 bg-white pb-2">
-        <button
-          aria-current={selected === ALL_COLLECTION}
-          onClick={() => onSelect(ALL_COLLECTION)}
-          className={`group flex items-center gap-2 py-2 text-sm text-neutral-600 ${SIDEBAR_ROW_CLASS}`}
-        >
-          <span className="text-neutral-600 shrink-0 transition-colors group-aria-[current=true]:text-sky-600"><CircleSmall size={16} /></span>
-          <span className="flex-1 min-w-0 font-normal text-left truncate">All</span>
-          {allCount > 0 && <span className="shrink-0 text-xs text-neutral-500 transition-colors group-aria-[current=true]:text-sky-500">{allCount}</span>}
-        </button>
-        </div>
-
+      <SidebarContainer
+        width={width}
+        header={<AllRow selected={selected === ALL_COLLECTION} count={allCount} onSelect={() => onSelect(ALL_COLLECTION)} />}
+      >
         <Accordion.Root
           multiple
           className="flex flex-col gap-2"
@@ -253,7 +243,9 @@ export function Sidebar({
             !isOpen && group.collections.some((c) => c.name === selected);
           return (
           <Accordion.Item key={group.name} value={group.name} className="flex flex-col">
-            <Accordion.Header>
+            {/* Sticky group header. Since All is a fixed header outside the scroll
+                area, this pins to the scroll top. bg masks the rows scrolling under. */}
+            <Accordion.Header className="sticky top-0 z-0 bg-white">
             <ContextMenu.Root>
               <ContextMenu.Trigger>
                 <Accordion.Trigger
