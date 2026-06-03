@@ -24,7 +24,7 @@ export function App() {
     showArchived: false,
   });
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTarget, setEditingTarget] = useState<{ id: string; field: "title" | "note" } | null>(null);
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
 
   // Always-current snapshot for keyboard handlers.
@@ -58,6 +58,11 @@ export function App() {
   const apply = useCallback((next: Snapshot) => setSnapshot(next), []);
   const requestConfirm = useCallback((req: ConfirmRequest) => setConfirm(req), []);
 
+  const onEdit = useCallback((id: string, field: "title" | "note") => {
+    setEditingTarget({ id, field });
+  }, []);
+  const onEndEdit = useCallback(() => setEditingTarget(null), []);
+
   // Cmd+N (create in selected collection; "All" → default) and Cmd+Backspace (delete focused).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -74,7 +79,7 @@ export function App() {
               .find((i) => i.title === "" && i.status === "draft" && (!target || i.collection === target));
             if (created) {
               setFocusedId(created.id);
-              setEditingId(created.id);
+              setEditingTarget({ id: created.id, field: "title" });
             }
           })
           .catch((err) => console.error(err));
@@ -111,10 +116,11 @@ export function App() {
         snapshot={snapshot}
         view={view}
         focusedId={focusedId}
-        editingId={editingId}
+        editingTarget={editingTarget}
         onSearch={(q) => setView((v) => ({ ...v, search: q }))}
         onFocusItem={setFocusedId}
-        onEditItem={setEditingId}
+        onEdit={onEdit}
+        onEndEdit={onEndEdit}
         onSnapshot={apply}
         onRequestConfirm={requestConfirm}
       />
