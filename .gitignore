@@ -9,3 +9,7 @@ tmp/
 
 # Node / frontend build output
 node_modules/
+
+# Local env overrides (Vite)
+.env.local
+.env.*.local
