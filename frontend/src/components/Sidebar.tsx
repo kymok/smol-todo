@@ -38,7 +38,7 @@ const COLLECTION_COLOR_CLASS: Record<CollectionColor, string> = {
 // Each row fills the container (px-2) full width, and px-2 re-insets its content
 // so the content lines up with the detail pane while the active background
 // extends toward the edge. Groups/View can't become active yet but share this for
-// future use.
+// future use. Vertical padding is per-row (groups py-1, everything else py-2).
 const SIDEBAR_ROW_CLASS =
   "w-full px-2 rounded-lg hover:bg-neutral-50 aria-[current=true]:bg-sky-100 aria-[current=true]:text-sky-600";
 
@@ -214,9 +214,11 @@ export function Sidebar({
           <span className="shrink-0">{allIncompleteCount(snapshot)}</span>
         </button>
 
+        {/* Keep mt-* (gap above the first group, i.e. between All and the groups)
+            in sync with gap-* (gap between groups) so the spacing stays uniform. */}
         <Accordion.Root
           multiple
-          className="flex flex-col gap-4 mt-4"
+          className="flex flex-col gap-2 mt-2"
           value={openGroupValue}
           onValueChange={handleGroupOpenChange}
         >
@@ -233,7 +235,7 @@ export function Sidebar({
               <ContextMenu.Trigger>
                 <Accordion.Trigger
                   aria-current={headerActive}
-                  className={`w-full py-2 text-left font-medium text-neutral-400 text-xs ${SIDEBAR_ROW_CLASS}`}
+                  className={`w-full py-1 text-left font-medium text-neutral-400 text-xs ${SIDEBAR_ROW_CLASS}`}
                 >
                   {group.name === "DefaultGroup" ? "No Group" : group.name}
                 </Accordion.Trigger>
@@ -266,7 +268,14 @@ export function Sidebar({
             </Accordion.Header>
 
             <Accordion.Panel className="flex flex-col">
-            {group.collections.map((c) => (
+            {group.collections.length === 0 ? (
+              // Empty-group placeholder: no icon, but a spacer matching the icon
+              // width keeps the text aligned with the other rows' labels.
+              <div className="flex items-center gap-2 px-2 py-2 text-sm text-neutral-400">
+                <span className="w-4 shrink-0" aria-hidden />
+                <span>No Collections</span>
+              </div>
+            ) : group.collections.map((c) => (
               <ContextMenu.Root key={c.name}>
                 <ContextMenu.Trigger>
                   <button
