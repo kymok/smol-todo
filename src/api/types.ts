@@ -24,3 +24,14 @@ export interface Settings {
   defaultPromptTemplate: string;
   lastSelectedCollection: string | null;
 }
+
+export interface InstallStatus {
+  linkPath: string;
+  targetPath: string;
+  installed: boolean;
+  conflictDescription?: string;
+  installDirectoryIsInPath: boolean;
+  canUninstall: boolean;
+  canInstall: boolean;
+  pathHint: string;
+}

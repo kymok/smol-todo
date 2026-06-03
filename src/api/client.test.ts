@@ -15,6 +15,8 @@ import {
   setSettings,
   setCollectionPrompt,
   exportCollection,
+  cliInstallStatus,
+  setStatuses,
 } from "./client";
 
 describe("api client", () => {
@@ -38,7 +40,7 @@ describe("api client", () => {
   it("createItem invokes create_item with the collection arg", async () => {
     invokeMock.mockResolvedValue({ items: [], collections: [], groups: [] });
     await createItem("Work/Docs");
-    expect(invokeMock).toHaveBeenCalledWith("create_item", { collection: "Work/Docs" });
+    expect(invokeMock).toHaveBeenCalledWith("create_item", { collection: "Work/Docs", title: null });
   });
 
   it("setStatus invokes set_status with id/status/ifCurrent", async () => {
@@ -102,5 +104,36 @@ describe("api client", () => {
       format: "jsonl",
       path: "/tmp/Work.jsonl",
     });
+  });
+
+  it("cliInstallStatus invokes cli_install_status", async () => {
+    invokeMock.mockResolvedValue({
+      linkPath: "/l", targetPath: "/t", installed: false,
+      installDirectoryIsInPath: false, canUninstall: false, canInstall: true, pathHint: "EXPORT",
+    });
+    const s = await cliInstallStatus();
+    expect(invokeMock).toHaveBeenCalledWith("cli_install_status");
+    expect(s.canInstall).toBe(true);
+  });
+
+  it("setStatuses invokes set_statuses with replacements + collection", async () => {
+    invokeMock.mockResolvedValue({ items: [], collections: [], groups: [] });
+    await setStatuses({ ready: "completed" }, "Work");
+    expect(invokeMock).toHaveBeenCalledWith("set_statuses", {
+      replacements: { ready: "completed" },
+      collection: "Work",
+    });
+  });
+
+  it("createItem passes collection + title", async () => {
+    invokeMock.mockResolvedValue({ items: [], collections: [], groups: [] });
+    await createItem("Work", "foo.txt");
+    expect(invokeMock).toHaveBeenCalledWith("create_item", { collection: "Work", title: "foo.txt" });
+  });
+
+  it("createItem with no args passes nulls", async () => {
+    invokeMock.mockResolvedValue({ items: [], collections: [], groups: [] });
+    await createItem();
+    expect(invokeMock).toHaveBeenCalledWith("create_item", { collection: null, title: null });
   });
 });

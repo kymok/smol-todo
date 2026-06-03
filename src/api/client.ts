@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { CollectionColor, Settings, Snapshot, TaskItem, TaskStatus } from "./types";
+import type { CollectionColor, InstallStatus, Settings, Snapshot, TaskItem, TaskStatus } from "./types";
 
 export function getSnapshot(): Promise<Snapshot> {
   return invoke<Snapshot>("get_snapshot");
@@ -11,8 +11,8 @@ export function onStoreChanged(callback: () => void): Promise<UnlistenFn> {
 }
 
 // --- Items ---
-export function createItem(collection?: string): Promise<Snapshot> {
-  return invoke<Snapshot>("create_item", { collection: collection ?? null });
+export function createItem(collection?: string, title?: string): Promise<Snapshot> {
+  return invoke<Snapshot>("create_item", { collection: collection ?? null, title: title ?? null });
 }
 
 export function updateItem(
@@ -146,4 +146,24 @@ export function exportCollection(
   path: string,
 ): Promise<void> {
   return invoke<void>("export_collection", { name, format, path });
+}
+
+// --- CLI install / bulk status ---
+export function cliInstallStatus(): Promise<InstallStatus> {
+  return invoke<InstallStatus>("cli_install_status");
+}
+
+export function cliInstall(): Promise<InstallStatus> {
+  return invoke<InstallStatus>("cli_install");
+}
+
+export function cliUninstall(): Promise<InstallStatus> {
+  return invoke<InstallStatus>("cli_uninstall");
+}
+
+export function setStatuses(
+  replacements: Record<string, string>,
+  collection: string,
+): Promise<Snapshot> {
+  return invoke<Snapshot>("set_statuses", { replacements, collection });
 }
