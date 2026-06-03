@@ -1,36 +1,22 @@
 import type { ReactNode } from "react";
 import { TITLE_BAR_HEIGHT } from "../layout";
 
-// Hardcoded 14px (intentionally NOT a spacing token) to match the native
-// macOS sidebar inset.
-const SIDEBAR_LEFT_INSET = 14;
-
-// Outer sidebar shell: owns the resizable width and the positioning context for
-// the right-edge resize handle, and applies the macOS window-chrome insets
-// (title-bar top clearance + native left inset). Children include the sidebar
-// content and the resize handle.
-//
-// Content spacing (vertical + right) lives on an inner wrapper so the spacing
-// tokens don't collide with the inline title-bar/left chrome offsets. The
-// resize handle is absolutely positioned against this outer div, so the inner
-// wrapper doesn't affect it.
+// Outer sidebar shell: owns the resizable width, the title-bar top clearance,
+// and the positioning context for the right-edge resize handle. The inner
+// wrapper applies the content padding (px-4). The handle is absolutely
+// positioned against this outer div, so the inner wrapper doesn't affect it.
 export function SidebarContainer({ width, children }: { width: number; children: ReactNode }) {
   return (
-    <div
-      style={{
-        width,
-        position: "relative",
-        flexShrink: 0,
-        paddingTop: TITLE_BAR_HEIGHT,
-        paddingLeft: SIDEBAR_LEFT_INSET,
-      }}
-    >
-      <div className="py-2 pr-2">{children}</div>
+    <div style={{ width, position: "relative", flexShrink: 0, paddingTop: TITLE_BAR_HEIGHT }}>
+      <div className="px-4 py-0">{children}</div>
     </div>
   );
 }
 
-// Detail/content pane shell: fills the remaining width and clears the title bar.
+// Detail/content pane shell: fills the remaining width and applies the shared
+// left inset so the title bar and content align. Title-bar clearance is owned by
+// DetailPane's title row (which is TITLE_BAR_HEIGHT tall), so there is no top
+// padding here.
 export function DetailContainer({ children }: { children: ReactNode }) {
-  return <div style={{ flexGrow: 1, paddingTop: TITLE_BAR_HEIGHT }}>{children}</div>;
+  return <div style={{ flexGrow: 1 }} className={"px-4"}>{children}</div>;
 }

@@ -8,6 +8,7 @@ import { createItem } from "../api/client";
 import type { FocusDir } from "../state/editor";
 import { TaskRow } from "./TaskRow";
 import { DetailContainer } from "./PaneContainers";
+import { TITLE_BAR_HEIGHT } from "../layout";
 
 export interface DetailPaneProps {
   snapshot: Snapshot;
@@ -63,13 +64,15 @@ export function DetailPane({
 
   return (
     <DetailContainer>
-      <div>
+      {/* Title bar: collection title vertically centered in the title-bar-height
+          strip, with the New Task (+) button pinned to the right end. */}
+      <div className="flex items-center justify-between" style={{ height: TITLE_BAR_HEIGHT }}>
         <h2>{title}</h2>
-        <div>
-          <Search />
-          <Input placeholder="Search" value={view.search} onChange={(e) => onSearch(e.target.value)} />
-          <button onClick={newTask}><Plus /> New Task</button>
-        </div>
+        <button onClick={newTask} aria-label="New Task"><Plus /></button>
+      </div>
+      <div>
+        <Search />
+        <Input placeholder="Search" value={view.search} onChange={(e) => onSearch(e.target.value)} />
       </div>
       <ScrollArea.Root>
         <ScrollArea.Viewport>
