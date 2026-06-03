@@ -12,6 +12,7 @@ import {
 } from "./api/client";
 import { ALL_COLLECTION, type ViewState } from "./state/view";
 import { TITLE_BAR_HEIGHT } from "./layout";
+import { DebugTitleBarBackground } from "./components/debug/DebugTitleBarBackground";
 import type { ConfirmRequest } from "./state/confirm";
 import { Sidebar } from "./components/Sidebar";
 import { DetailPane } from "./components/DetailPane";
@@ -275,21 +276,7 @@ export function App() {
         onError={onError}
         onRequestConfirm={requestConfirm}
       />
-      {/* Debug-only visualization of the drag strip. Dragging itself is handled
-          by startWindowDrag on the root, so this sits behind everything and
-          ignores pointer events. */}
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: TITLE_BAR_HEIGHT,
-          backgroundColor: "#f3f4f6",
-          pointerEvents: "none",
-          zIndex: -1,
-        }}
-      />
+      <DebugTitleBarBackground />
 
       <SettingsDialog
         open={settingsOpen}
