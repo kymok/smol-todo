@@ -7,9 +7,11 @@ import {
 } from "../state/view";
 import type { ConfirmRequest } from "../state/confirm";
 import {
-  clearItems, createCollection, createGroup, deleteCollection, deleteGroup,
-  moveCollection, renameCollection, renameGroup, setCollectionArchived, setCollectionColor,
+  clearItems, collectionCliCommand, collectionPromptText, createCollection, createGroup,
+  deleteCollection, deleteGroup, moveCollection, renameCollection, renameGroup,
+  setCollectionArchived, setCollectionColor,
 } from "../api/client";
+import { copyText } from "../lib/clipboard";
 
 const COLORS: CollectionColor[] = ["gray", "red", "orange", "yellow", "green", "blue", "purple"];
 
@@ -33,6 +35,7 @@ export interface SidebarProps {
   onToggleAutoDraft: () => void;
   onToggleAlwaysOnTop: () => void;
   onOpenSettings: () => void;
+  onEditPrompt: (name: string) => void;
   onSnapshot: (snap: Snapshot) => void;
   onError: (msg: string) => void;
   onRequestConfirm: (req: ConfirmRequest) => void;
@@ -41,7 +44,7 @@ export interface SidebarProps {
 export function Sidebar({
   snapshot, selected, showArchived, hideCompleted, usesAutoDraft, alwaysOnTop,
   onSelect, onToggleHideCompleted, onToggleShowArchived, onToggleAutoDraft, onToggleAlwaysOnTop,
-  onOpenSettings, onSnapshot, onError, onRequestConfirm,
+  onOpenSettings, onEditPrompt, onSnapshot, onError, onRequestConfirm,
 }: SidebarProps) {
   const groupNames = snapshot.groups.map((g) => g.name);
 
@@ -162,6 +165,22 @@ export function Sidebar({
                 </ContextMenu.Trigger>
                 <ContextMenu.Content>
                   <ContextMenu.Item onSelect={() => renameCol(c)}>Rename</ContextMenu.Item>
+                  <ContextMenu.Item onSelect={() => onEditPrompt(c.name)}>Edit Prompt…</ContextMenu.Item>
+                  <ContextMenu.Item
+                    onSelect={() =>
+                      collectionPromptText(c.name).then(copyText).catch((e) => onError(String(e)))
+                    }
+                  >
+                    Copy Prompt
+                  </ContextMenu.Item>
+                  <ContextMenu.Item
+                    onSelect={() =>
+                      collectionCliCommand(c.name).then(copyText).catch((e) => onError(String(e)))
+                    }
+                  >
+                    Copy CLI Command
+                  </ContextMenu.Item>
+                  <ContextMenu.Separator />
 
                   <ContextMenu.Sub>
                     <ContextMenu.SubTrigger>Color</ContextMenu.SubTrigger>

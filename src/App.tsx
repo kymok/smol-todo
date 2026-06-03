@@ -15,6 +15,7 @@ import type { ConfirmRequest } from "./state/confirm";
 import { Sidebar } from "./components/Sidebar";
 import { DetailPane } from "./components/DetailPane";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { PromptEditorDialog } from "./components/PromptEditorDialog";
 
 const EMPTY: Snapshot = { items: [], collections: [], groups: [] };
 
@@ -38,6 +39,7 @@ export function App() {
   const [editingTarget, setEditingTarget] = useState<{ id: string; field: "title" | "note" } | null>(null);
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [promptCollection, setPromptCollection] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const onError = useCallback((msg: string) => setErrorMessage(msg), []);
   const [settings, setSettingsState] = useState<Settings>(DEFAULT_SETTINGS);
@@ -181,6 +183,11 @@ export function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  const promptInitial =
+    promptCollection === null
+      ? undefined
+      : snapshot.collections.find((c) => c.name === promptCollection)?.promptTemplate;
+
   return (
     <Flex height="100vh">
       <Sidebar
@@ -196,6 +203,7 @@ export function App() {
         onToggleAutoDraft={() => updateSettings({ usesAutoDraft: !settingsRef.current.usesAutoDraft })}
         onToggleAlwaysOnTop={() => updateSettings({ alwaysOnTop: !settingsRef.current.alwaysOnTop })}
         onOpenSettings={() => setSettingsOpen(true)}
+        onEditPrompt={(name) => setPromptCollection(name)}
         onSnapshot={apply}
         onError={onError}
         onRequestConfirm={requestConfirm}
@@ -216,6 +224,14 @@ export function App() {
       />
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+
+      <PromptEditorDialog
+        collection={promptCollection}
+        initialTemplate={promptInitial}
+        onClose={() => setPromptCollection(null)}
+        onSnapshot={apply}
+        onError={onError}
+      />
 
       <AlertDialog.Root open={errorMessage !== null} onOpenChange={(o) => { if (!o) setErrorMessage(null); }}>
         <AlertDialog.Content maxWidth="420px">
