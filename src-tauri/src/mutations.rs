@@ -187,10 +187,21 @@ pub fn delete_group(store: &TaskStore, name: &str) -> Result<SnapshotDto> {
     build_snapshot(store)
 }
 
+/// Set or clear a collection's prompt override. `template` `None`/empty clears it
+/// (pond-core trims + drops empty internally). Returns the rebuilt snapshot.
+pub fn set_collection_prompt(
+    store: &TaskStore,
+    name: &str,
+    template: Option<&str>,
+) -> Result<SnapshotDto> {
+    store.set_collection_prompt(name, template)?;
+    build_snapshot(store)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pond_core::{CollectionColor, DEFAULT_GROUP};
+    use pond_core::{CollectionColor, TaskStatus, DEFAULT_GROUP};
     use tempfile::tempdir;
 
     fn store() -> (tempfile::TempDir, TaskStore) {
@@ -446,5 +457,30 @@ mod tests {
         assert!(!snap.groups.iter().any(|g| g.name == "Personal"));
         let snap = delete_group(&store, "Home").unwrap();
         assert!(!snap.groups.iter().any(|g| g.name == "Home"));
+    }
+
+    #[test]
+    fn set_collection_prompt_sets_and_clears_override() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add("Task", "Work", None, false, TaskStatus::Ready)
+            .unwrap();
+
+        // Set an override.
+        let snap = set_collection_prompt(&store, "Work", Some("My prompt")).unwrap();
+        let work = snap.collections.iter().find(|c| c.name == "Work").unwrap();
+        assert_eq!(work.prompt_template.as_deref(), Some("My prompt"));
+
+        // Clearing with None removes it.
+        let snap = set_collection_prompt(&store, "Work", None).unwrap();
+        let work = snap.collections.iter().find(|c| c.name == "Work").unwrap();
+        assert_eq!(work.prompt_template, None);
+
+        // Clearing with an empty/whitespace string also removes it (pond-core trims).
+        set_collection_prompt(&store, "Work", Some("Set again")).unwrap();
+        let snap = set_collection_prompt(&store, "Work", Some("   ")).unwrap();
+        let work = snap.collections.iter().find(|c| c.name == "Work").unwrap();
+        assert_eq!(work.prompt_template, None);
     }
 }

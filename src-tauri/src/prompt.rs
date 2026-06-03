@@ -1,6 +1,3 @@
-// Functions are forward-declared here for use in commands.rs (Task 3+).
-#![allow(dead_code)]
-
 use pond_core::prompt::APPLICATION_DEFAULT_TEMPLATE;
 
 /// The effective app-default template: the stored default if it is non-empty

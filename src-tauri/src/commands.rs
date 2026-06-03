@@ -1,7 +1,9 @@
 use crate::dto::{CollectionGroupSummaryDto, CollectionSummaryDto, SnapshotDto};
 use crate::mutations;
+use crate::prompt;
 use crate::settings::{self, Settings};
 use pond_core::{CollectionColor, Result, TaskItem, TaskStatus, TaskStore};
+use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::State;
 
@@ -255,9 +257,48 @@ pub fn store_path(store: State<TaskStore>) -> String {
     store.file_path().display().to_string()
 }
 
+#[tauri::command]
+pub fn set_collection_prompt(
+    store: State<TaskStore>,
+    name: String,
+    template: Option<String>,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::set_collection_prompt(&store, &name, template.as_deref()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn collection_prompt_text(
+    store: State<TaskStore>,
+    settings: State<Mutex<Settings>>,
+    name: String,
+) -> std::result::Result<String, String> {
+    let summaries = store.collection_summaries().map_err(|e| e.to_string())?;
+    let collection_template = summaries
+        .iter()
+        .find(|c| c.name == name)
+        .and_then(|c| c.prompt_template.clone());
+    let stored_default = {
+        let guard = settings.lock().map_err(|e| e.to_string())?;
+        guard.default_prompt_template.clone()
+    };
+    let template =
+        prompt::effective_collection_template(collection_template.as_deref(), &stored_default);
+    let variables = HashMap::from([
+        ("cliCommand".to_string(), prompt::cli_command(&name)),
+        ("collectionName".to_string(), name.clone()),
+    ]);
+    Ok(pond_core::prompt::evaluate(&template, &variables))
+}
+
+#[tauri::command]
+pub fn collection_cli_command(name: String) -> String {
+    prompt::cli_command(&name)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pond_core::prompt::APPLICATION_DEFAULT_TEMPLATE;
     use pond_core::TaskStatus;
     use tempfile::tempdir;
 
@@ -274,5 +315,53 @@ mod tests {
         assert_eq!(snap.items[0].title, "Ship it");
         assert!(snap.collections.iter().any(|c| c.name == "Work/Docs"));
         assert!(snap.groups.iter().any(|g| g.name == "Work"));
+    }
+
+    #[test]
+    fn collection_prompt_text_precedence() {
+        let dir = tempdir().unwrap();
+        let store = TaskStore::new(dir.path().join("tasks.json"));
+        store
+            .add("Task", "Work", None, false, TaskStatus::Ready)
+            .unwrap();
+
+        // Helper mirroring collection_prompt_text's resolution for a given settings default.
+        let resolve = |default: &str| -> String {
+            let summaries = store.collection_summaries().unwrap();
+            let collection_template = summaries
+                .iter()
+                .find(|c| c.name == "Work")
+                .and_then(|c| c.prompt_template.clone());
+            let template = crate::prompt::effective_collection_template(
+                collection_template.as_deref(),
+                default,
+            );
+            let variables = std::collections::HashMap::from([
+                ("cliCommand".to_string(), crate::prompt::cli_command("Work")),
+                ("collectionName".to_string(), "Work".to_string()),
+            ]);
+            pond_core::prompt::evaluate(&template, &variables)
+        };
+
+        // No override, no default setting → built-in template, evaluated.
+        let builtin = resolve("");
+        assert!(builtin.contains("taskpond item get --collection 'Work'"));
+        assert!(!builtin.contains("{{cliCommand}}"));
+        // Sanity: the built-in source contains the token before evaluation.
+        assert!(APPLICATION_DEFAULT_TEMPLATE.contains("{{cliCommand}}"));
+
+        // Default setting layer (no collection override) wins over built-in.
+        let from_default = resolve("Default: {{collectionName}} via {{cliCommand}}");
+        assert_eq!(
+            from_default,
+            "Default: Work via taskpond item get --collection 'Work'"
+        );
+
+        // Collection override wins over the default setting.
+        store
+            .set_collection_prompt("Work", Some("Override: {{collectionName}}"))
+            .unwrap();
+        let from_override = resolve("Default: should be ignored");
+        assert_eq!(from_override, "Override: Work");
     }
 }

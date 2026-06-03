@@ -40,6 +40,9 @@ fn main() {
             commands::get_settings,
             commands::set_settings,
             commands::store_path,
+            commands::set_collection_prompt,
+            commands::collection_prompt_text,
+            commands::collection_cli_command,
         ])
         .setup(|app| {
             app.manage(pond_core::TaskStore::open_default());
