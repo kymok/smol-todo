@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../frontend/dist",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "node Scripts/build-sidecar.mjs debug && cd frontend && npm run dev",
-    "beforeBuildCommand": "node Scripts/build-sidecar.mjs release && cd frontend && npm run build"
+    "beforeDevCommand": "node ../Scripts/build-sidecar.mjs debug && npm run dev",
+    "beforeBuildCommand": "node ../Scripts/build-sidecar.mjs release && npm run build"
   },
   "app": {
     "windows": [{ "label": "main", "title": "Pond", "width": 900, "height": 600, "minWidth": 480, "minHeight": 320 }],
