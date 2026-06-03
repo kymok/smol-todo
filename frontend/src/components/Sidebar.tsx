@@ -40,12 +40,12 @@ const COLLECTION_COLOR_CLASS: Record<CollectionColor, string> = {
 // extends toward the edge. Groups/View can't become active yet but share this for
 // future use. Vertical padding is per-row (groups py-1, everything else py-2).
 //
-// SIDEBAR_ROW_BASE omits the hover and active-background styles so group headers
-// can show hover/active via text color only; the other rows add the background
-// hover and active background on top.
+// SIDEBAR_ROW_BASE omits the hover and active-background styles. Every row darkens
+// its text on hover (no background); rows other than group headers also get an
+// active background on top.
 const SIDEBAR_ROW_BASE =
-  "w-full px-2 rounded-lg aria-[current=true]:text-sky-600";
-const SIDEBAR_ROW_CLASS = `${SIDEBAR_ROW_BASE} hover:bg-neutral-50 aria-[current=true]:bg-sky-100`;
+  "w-full px-2 rounded-xl transition-colors aria-[current=true]:text-sky-600";
+const SIDEBAR_ROW_CLASS = `${SIDEBAR_ROW_BASE} hover:text-neutral-900 aria-[current=true]:bg-sky-50`;
 
 interface PromptState {
   title: string;
@@ -213,11 +213,11 @@ export function Sidebar({
         <button
           aria-current={selected === ALL_COLLECTION}
           onClick={() => onSelect(ALL_COLLECTION)}
-          className={`group flex items-center gap-2 py-2 -mt-2 text-sm text-neutral-800 ${SIDEBAR_ROW_CLASS}`}
+          className={`group flex items-center gap-2 py-2 -mt-2 text-sm text-neutral-600 ${SIDEBAR_ROW_CLASS}`}
         >
-          <span className="text-neutral-600 shrink-0 group-aria-[current=true]:text-sky-600"><CircleSmall size={16} /></span>
+          <span className="text-neutral-600 shrink-0 transition-colors group-aria-[current=true]:text-sky-600"><CircleSmall size={16} /></span>
           <span className="flex-1 min-w-0 font-normal text-left truncate">All</span>
-          {allCount > 0 && <span className="shrink-0 text-xs text-neutral-500 group-aria-[current=true]:text-sky-500">{allCount}</span>}
+          {allCount > 0 && <span className="shrink-0 text-xs text-neutral-500 transition-colors group-aria-[current=true]:text-sky-500">{allCount}</span>}
         </button>
 
         {/* Keep mt-* (gap above the first group, i.e. between All and the groups)
@@ -288,15 +288,15 @@ export function Sidebar({
                     aria-current={selected === c.name}
                     onClick={() => onSelect(c.name)}
                     style={c.isArchived ? { opacity: 0.5 } : undefined}
-                    className={`group flex items-center gap-2 py-2 text-sm text-neutral-800 ${SIDEBAR_ROW_CLASS}`}
+                    className={`group flex items-center gap-2 py-2 text-sm text-neutral-600 ${SIDEBAR_ROW_CLASS}`}
                   >
-                    <span className={`shrink-0 ${c.name === DEFAULT_COLLECTION ? "text-neutral-600 group-aria-[current=true]:text-sky-600" : COLLECTION_COLOR_CLASS[c.color]}`}>
+                    <span className={`shrink-0 transition-colors ${c.name === DEFAULT_COLLECTION ? "text-neutral-600 group-aria-[current=true]:text-sky-600" : COLLECTION_COLOR_CLASS[c.color]}`}>
                       {c.isArchived ? <Archive size={16} />
                         : c.name === DEFAULT_COLLECTION ? <Inbox size={16} />
                         : <FilledCircle size={16} />}
                     </span>
                     <span className="flex-1 min-w-0 font-normal text-left truncate">{c.displayName}</span>
-                    {c.incompleteCount > 0 && <span className="shrink-0 text-xs text-neutral-500 group-aria-[current=true]:text-sky-500">{c.incompleteCount}</span>}
+                    {c.incompleteCount > 0 && <span className="shrink-0 text-xs text-neutral-500 transition-colors group-aria-[current=true]:text-sky-500">{c.incompleteCount}</span>}
                   </button>
                 </ContextMenu.Trigger>
                 <ContextMenu.Portal>
