@@ -300,7 +300,7 @@ export function Sidebar({
             {group.collections.length === 0 ? (
               // Empty-group placeholder: no icon, but a spacer matching the icon
               // width keeps the text aligned with the other rows' labels.
-              <div className="flex items-center gap-2 px-2 py-2 text-neutral-400 text-sm">
+              <div className="flex items-center gap-2 px-2 py-2 text-neutral-300 text-sm">
                 <span className="w-4 shrink-0" aria-hidden />
                 <span>No Collections</span>
               </div>

@@ -51,7 +51,7 @@ export function DetailPane({
       {/* Title bar: collection title vertically centered in the title-bar-height
           strip. A bottom border fades in (animated) only once the list is scrolled. */}
       <div
-        className={`flex shrink-0 items-center border-b transition-colors ${scrolled ? "border-neutral-50" : "border-transparent"}`}
+        className={`flex shrink-0 items-center border-b transition-colors ${scrolled ? "border-neutral-100" : "border-transparent"}`}
         style={{ height: TITLE_BAR_HEIGHT }}
       >
         <h2>{title}</h2>
@@ -61,6 +61,7 @@ export function DetailPane({
           className="h-full"
           onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 0)}
         >
+          <div className="flex flex-col gap-4">
           {items.map((item, i) => (
             <TaskRow
               key={item.id}
@@ -80,6 +81,7 @@ export function DetailPane({
               onError={onError}
             />
           ))}
+          </div>
         </ScrollArea.Viewport>
         <ScrollArea.Scrollbar>
           <ScrollArea.Thumb />
