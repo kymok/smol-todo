@@ -61,4 +61,21 @@ describe("hideCompleted + showArchived", () => {
     expect(sidebarGroups(s, false)[0].collections.map((c) => c.name)).toEqual(["Work/A"]);
     expect(sidebarGroups(s, true)[0].collections.map((c) => c.name)).toEqual(["Work/A", "Work/B"]);
   });
+
+  it("sidebarGroups keeps non-default empty groups but drops empty DefaultGroup", () => {
+    const col = { name: "Work/A", displayName: "A", groupName: "Work", totalCount: 0, incompleteCount: 0, color: "gray" as const, isArchived: false };
+    const s: Snapshot = {
+      items: [],
+      collections: [],
+      groups: [
+        { name: "EmptyNonDefault", collections: [] },
+        { name: "DefaultGroup", collections: [] },
+        { name: "Work", collections: [col] },
+      ],
+    };
+    const names = sidebarGroups(s, false).map((g) => g.name);
+    expect(names).toContain("EmptyNonDefault");
+    expect(names).not.toContain("DefaultGroup");
+    expect(names).toContain("Work");
+  });
 });

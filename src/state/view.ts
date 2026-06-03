@@ -37,5 +37,5 @@ export function allIncompleteCount(snapshot: Snapshot): number {
 export function sidebarGroups(snapshot: Snapshot, showArchived: boolean): CollectionGroupSummary[] {
   return snapshot.groups
     .map((g) => ({ ...g, collections: g.collections.filter((c) => showArchived || !c.isArchived) }))
-    .filter((g) => g.collections.length > 0);
+    .filter((g) => g.name !== "DefaultGroup" || g.collections.length > 0);
 }
