@@ -13,7 +13,7 @@ Node + npm, and the Tauri CLI.
 
 ```sh
 cargo install tauri-cli --version "^2"   # once (or use: npx @tauri-apps/cli)
-npm install
+(cd frontend && npm install)
 cargo tauri dev                          # launch with hot-reload against the Vite dev server
 ```
 
@@ -98,11 +98,11 @@ The desktop app's **Settings → Command** tab installs a `taskpond` symlink at
 crates/pond-core      data store + domain logic (also hosts the macOS `cli_install` module)
 crates/taskpond-cli   the `taskpond` CLI binary (clap)
 src-tauri/            the Tauri app: Rust commands over pond-core + the file watcher
-src/                  the React + Radix Themes frontend
+frontend/             the React + Radix Themes frontend (Vite)
 ```
 
-Tests: `cargo test` (Rust workspace) and `npm test` (frontend logic, Vitest). Run the CLI
-directly with `cargo run -p taskpond-cli -- item get`. The store path honors `POND_STORE`.
+Tests: `cargo test` (Rust workspace) and `(cd frontend && npm test)` (frontend logic, Vitest).
+Run the CLI directly with `cargo run -p taskpond-cli -- item get`. The store path honors `POND_STORE`.
 
 ## Legacy SwiftUI app
 
