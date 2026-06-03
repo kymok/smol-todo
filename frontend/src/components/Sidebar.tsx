@@ -16,6 +16,7 @@ import {
 } from "../api/client";
 import { copyText } from "../lib/clipboard";
 import { save } from "@tauri-apps/plugin-dialog";
+import { SidebarContainer } from "./PaneContainers";
 
 const COLORS: CollectionColor[] = ["gray", "red", "orange", "yellow", "green", "blue", "purple"];
 
@@ -26,9 +27,20 @@ interface PromptState {
   submit: (value: string) => void;
 }
 
+// Default resize bounds when the host does not supply them.
+const DEFAULT_MIN_WIDTH = 120;
+const DEFAULT_MAX_WIDTH = 600;
+const DEFAULT_WIDTH = 240;
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
 export interface SidebarProps {
   snapshot: Snapshot;
   selected: string;
+  /** Smallest width the sidebar can be dragged to, in px. Defaults to 120. */
+  minWidth?: number;
+  /** Largest width the sidebar can be dragged to, in px. Defaults to 600. */
+  maxWidth?: number;
   showArchived: boolean;
   hideCompleted: boolean;
   usesAutoDraft: boolean;
@@ -48,10 +60,39 @@ export interface SidebarProps {
 
 export function Sidebar({
   snapshot, selected, showArchived, hideCompleted, usesAutoDraft, alwaysOnTop,
+  minWidth = DEFAULT_MIN_WIDTH, maxWidth = DEFAULT_MAX_WIDTH,
   onSelect, onToggleHideCompleted, onToggleShowArchived, onToggleAutoDraft, onToggleAlwaysOnTop,
   onOpenSettings, onEditPrompt, onChangeStatuses, onSnapshot, onError, onRequestConfirm,
 }: SidebarProps) {
   const groupNames = snapshot.groups.map((g) => g.name);
+
+  const [width, setWidth] = useState(() => clamp(DEFAULT_WIDTH, minWidth, maxWidth));
+  const [dragging, setDragging] = useState(false);
+
+  // Keep the current width within bounds if min/max change underneath us.
+  useEffect(() => {
+    setWidth((w) => clamp(w, minWidth, maxWidth));
+  }, [minWidth, maxWidth]);
+
+  // Drag the right-edge handle to resize. We capture the starting width/x on
+  // pointerdown and track movement on the window so the drag continues even if
+  // the pointer leaves the thin handle.
+  const startResize = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = width;
+    setDragging(true);
+    const onMove = (ev: PointerEvent) => {
+      setWidth(clamp(startWidth + (ev.clientX - startX), minWidth, maxWidth));
+    };
+    const onUp = () => {
+      setDragging(false);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
 
   const [prompt, setPrompt] = useState<PromptState | null>(null);
   const [promptValue, setPromptValue] = useState("");
@@ -129,7 +170,7 @@ export function Sidebar({
         </Dialog.Portal>
       </Dialog.Root>
 
-      <div data-tauri-drag-region style={{ width: 240 }}>
+      <SidebarContainer width={width}>
         <button aria-current={selected === ALL_COLLECTION} onClick={() => onSelect(ALL_COLLECTION)}>
           <span>All</span>
           <span>{allIncompleteCount(snapshot)}</span>
@@ -341,7 +382,21 @@ export function Sidebar({
             </Menu.Positioner>
           </Menu.Portal>
         </Menu.Root>
-      </div>
+
+        {/* Right-edge resize handle. */}
+        <div
+          onPointerDown={startResize}
+          role="separator"
+          aria-orientation="vertical"
+          className="group top-0 right-0 absolute flex justify-center -mr-4 w-8 h-full cursor-col-resize"
+        >
+          <div
+            className={`h-full w-px transition-colors ${
+              dragging ? "bg-gray-300" : "bg-gray-50 group-hover:bg-gray-200"
+            }`}
+          />
+        </div>
+      </SidebarContainer>
     </>
   );
 }

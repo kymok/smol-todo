@@ -11,6 +11,7 @@ import {
   setSettings,
 } from "./api/client";
 import { ALL_COLLECTION, type ViewState } from "./state/view";
+import { TITLE_BAR_HEIGHT } from "./layout";
 import type { ConfirmRequest } from "./state/confirm";
 import { Sidebar } from "./components/Sidebar";
 import { DetailPane } from "./components/DetailPane";
@@ -91,6 +92,19 @@ export function App() {
   // and pass the resolved snapshot here.
   const apply = useCallback((next: Snapshot) => setSnapshot(next), []);
   const requestConfirm = useCallback((req: ConfirmRequest) => setConfirm(req), []);
+
+  // Window drag: start moving the window when the press lands in the top 40px
+  // "header" strip and not on an interactive element. Lets the sidebar/content
+  // stay at their original positions (no overlay capturing their clicks).
+  const startWindowDrag = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    if (e.clientY > TITLE_BAR_HEIGHT) return;
+    const el = e.target as HTMLElement;
+    if (el.closest('button, a, input, textarea, select, [role="separator"], [role="menuitem"], [contenteditable="true"]')) {
+      return;
+    }
+    getCurrentWindow().startDragging().catch((err) => console.error(err));
+  }, []);
 
   // Merge a partial change into settings, persist the whole object, and update state
   // from the persisted result.
@@ -227,7 +241,7 @@ export function App() {
       : snapshot.collections.find((c) => c.name === promptCollection)?.promptTemplate;
 
   return (
-    <div style={{ display: "flex", height: "100vh" }}>
+    <div onMouseDown={startWindowDrag} style={{ position: "relative", display: "flex", height: "100vh" }}>
       <Sidebar
         snapshot={snapshot}
         selected={view.selected}
@@ -260,6 +274,21 @@ export function App() {
         onSnapshot={apply}
         onError={onError}
         onRequestConfirm={requestConfirm}
+      />
+      {/* Debug-only visualization of the drag strip. Dragging itself is handled
+          by startWindowDrag on the root, so this sits behind everything and
+          ignores pointer events. */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: TITLE_BAR_HEIGHT,
+          backgroundColor: "#f3f4f6",
+          pointerEvents: "none",
+          zIndex: -1,
+        }}
       />
 
       <SettingsDialog

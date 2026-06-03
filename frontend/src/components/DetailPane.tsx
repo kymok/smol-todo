@@ -7,6 +7,7 @@ import { ALL_COLLECTION, visibleItems, type ViewState } from "../state/view";
 import { createItem } from "../api/client";
 import type { FocusDir } from "../state/editor";
 import { TaskRow } from "./TaskRow";
+import { DetailContainer } from "./PaneContainers";
 
 export interface DetailPaneProps {
   snapshot: Snapshot;
@@ -61,8 +62,8 @@ export function DetailPane({
   };
 
   return (
-    <div style={{ flexGrow: 1 }}>
-      <div data-tauri-drag-region>
+    <DetailContainer>
+      <div>
         <h2>{title}</h2>
         <div>
           <Search />
@@ -96,6 +97,6 @@ export function DetailPane({
           <ScrollArea.Thumb />
         </ScrollArea.Scrollbar>
       </ScrollArea.Root>
-    </div>
+    </DetailContainer>
   );
 }
