@@ -16,23 +16,12 @@ import {
   renameGroup, setCollectionArchived, setCollectionColor,
 } from "../api/client";
 import { copyText } from "../lib/clipboard";
+import { COLLECTION_COLOR_CLASS } from "../lib/collectionColor";
 import { save } from "@tauri-apps/plugin-dialog";
 import { SidebarContainer } from "./PaneContainers";
 import { FilledCircle } from "./icons/FilledCircle";
 
 const COLORS: CollectionColor[] = ["gray", "red", "orange", "yellow", "green", "blue", "purple"];
-
-// Maps each collection color to a Tailwind text-color class. Full class strings
-// (not interpolated) so Tailwind's scanner picks them up.
-const COLLECTION_COLOR_CLASS: Record<CollectionColor, string> = {
-  gray: "text-neutral-500",
-  red: "text-red-500",
-  orange: "text-orange-500",
-  yellow: "text-yellow-500",
-  green: "text-emerald-500",
-  blue: "text-sky-500",
-  purple: "text-violet-500",
-};
 
 // Shared row chrome for sidebar items (All, collections, group headers, View).
 // Each row fills the container (px-2) full width, and px-2 re-insets its content

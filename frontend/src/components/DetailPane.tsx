@@ -7,6 +7,7 @@ import type { FocusDir } from "../state/editor";
 import { TaskRow } from "./TaskRow";
 import { DetailContainer } from "./PaneContainers";
 import { TITLE_BAR_HEIGHT } from "../layout";
+import { COLLECTION_COLOR_CLASS } from "../lib/collectionColor";
 
 export interface DetailPaneProps {
   snapshot: Snapshot;
@@ -29,9 +30,14 @@ export function DetailPane({
 }: DetailPaneProps) {
   const [scrolled, setScrolled] = useState(false);
   const items = visibleItems(snapshot, view);
-  const title = view.selected === ALL_COLLECTION
-    ? "All"
-    : snapshot.collections.find((c) => c.name === view.selected)?.displayName ?? view.selected;
+  const selectedCollection =
+    view.selected === ALL_COLLECTION
+      ? undefined
+      : snapshot.collections.find((c) => c.name === view.selected);
+  const title = selectedCollection?.displayName ?? (view.selected === ALL_COLLECTION ? "All" : view.selected);
+  // Title takes the selected collection's color (gray → neutral-500); All falls
+  // back to the gray/neutral default.
+  const titleColorClass = COLLECTION_COLOR_CLASS[selectedCollection?.color ?? "gray"];
 
   const moveFocus = (dir: FocusDir) => {
     if (items.length === 0) return;
@@ -54,7 +60,7 @@ export function DetailPane({
         className={`flex shrink-0 items-center border-b transition-colors ${scrolled ? "border-neutral-100" : "border-transparent"}`}
         style={{ height: TITLE_BAR_HEIGHT }}
       >
-        <h2>{title}</h2>
+        <h2 className={`font-bold ${titleColorClass}`}>{title}</h2>
       </div>
       <ScrollArea.Root className="min-h-0 flex-1">
         <ScrollArea.Viewport
