@@ -5,6 +5,7 @@ import { setStatus, moveItem, deleteItem } from "../api/client";
 import { leadingStatusClickTarget, rightClickStatusTarget } from "../state/status";
 import type { FocusDir } from "../state/editor";
 import { InlineEditor } from "./InlineEditor";
+import { copyText } from "../lib/clipboard";
 
 const STATUS_COLOR: Record<TaskStatus, CollectionColor> = {
   draft: "gray", ready: "gray", "in-progress": "blue", completed: "green",
@@ -127,6 +128,12 @@ export function TaskRow({
             ))}
           </ContextMenu.SubContent>
         </ContextMenu.Sub>
+
+        <ContextMenu.Item
+          onSelect={() => copyText(item.id).catch((e) => onError(String(e)))}
+        >
+          Copy ID
+        </ContextMenu.Item>
 
         <ContextMenu.Separator />
         <ContextMenu.Item
