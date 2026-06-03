@@ -30,6 +30,9 @@ fn main() {
             commands::move_collection,
             commands::clear_items,
             commands::delete_collection,
+            commands::create_group,
+            commands::rename_group,
+            commands::delete_group,
         ])
         .setup(|app| {
             app.manage(pond_core::TaskStore::open_default());

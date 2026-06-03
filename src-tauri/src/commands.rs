@@ -206,6 +206,31 @@ pub fn delete_collection(
     mutations::delete_collection(&store, &name).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn create_group(
+    store: State<TaskStore>,
+    name: String,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::create_group(&store, &name).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn rename_group(
+    store: State<TaskStore>,
+    old: String,
+    new: String,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::rename_group(&store, &old, &new).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_group(
+    store: State<TaskStore>,
+    name: String,
+) -> std::result::Result<SnapshotDto, String> {
+    mutations::delete_group(&store, &name).map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -172,6 +172,21 @@ pub fn delete_collection(store: &TaskStore, name: &str) -> Result<SnapshotDto> {
     build_snapshot(store)
 }
 
+pub fn create_group(store: &TaskStore, name: &str) -> Result<SnapshotDto> {
+    store.create_group(name)?;
+    build_snapshot(store)
+}
+
+pub fn rename_group(store: &TaskStore, old: &str, new: &str) -> Result<SnapshotDto> {
+    store.rename_group(old, new)?;
+    build_snapshot(store)
+}
+
+pub fn delete_group(store: &TaskStore, name: &str) -> Result<SnapshotDto> {
+    store.delete_group(name)?;
+    build_snapshot(store)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -419,5 +434,17 @@ mod tests {
             1
         );
         assert_eq!(snap.items[0].title, "keep");
+    }
+
+    #[test]
+    fn group_lifecycle() {
+        let (_dir, store) = store();
+        let snap = create_group(&store, "Personal").unwrap();
+        assert!(snap.groups.iter().any(|g| g.name == "Personal"));
+        let snap = rename_group(&store, "Personal", "Home").unwrap();
+        assert!(snap.groups.iter().any(|g| g.name == "Home"));
+        assert!(!snap.groups.iter().any(|g| g.name == "Personal"));
+        let snap = delete_group(&store, "Home").unwrap();
+        assert!(!snap.groups.iter().any(|g| g.name == "Home"));
     }
 }
