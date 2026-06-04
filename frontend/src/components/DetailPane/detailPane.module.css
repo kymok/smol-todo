@@ -41,6 +41,8 @@
   min-inline-size: 0;
   overflow: hidden;
   font-family: "Libre Baskerville", Georgia, serif;
+  font-size: 18px;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
