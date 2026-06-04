@@ -1,0 +1,55 @@
+.detailPane {
+  flex: 1 1 auto;
+  block-size: 100%;
+  min-inline-size: 0;
+  min-block-size: 0;
+}
+
+.scrollArea,
+.viewport {
+  block-size: 100%;
+}
+
+.header {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  block-size: var(--header-height);
+  padding-inline: var(--detail-padding-x);
+  background: canvas;
+}
+
+.header::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  block-size: 1px;
+  background: var(--gray-3);
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.headerStuck::after {
+  opacity: 1;
+}
+
+.title {
+  min-inline-size: 0;
+  overflow: hidden;
+  font-family: "Libre Baskerville", Georgia, serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+}
+
+.content {
+  padding: var(--detail-padding-y) var(--detail-padding-x);
+}

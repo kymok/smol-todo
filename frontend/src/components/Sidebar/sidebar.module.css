@@ -1,0 +1,40 @@
+.sidebar {
+  position: relative;
+  flex: 0 0 auto;
+  block-size: 100%;
+  padding-block-start: var(--header-height);
+  min-block-size: 0;
+}
+
+.inner {
+  block-size: 100%;
+  overflow-y: auto;
+  padding: var(--sidebar-padding-y) var(--sidebar-padding-x);
+}
+
+.resizer {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: -8px;
+  inline-size: 16px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.resizer::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 50%;
+  inline-size: 1px;
+  background: var(--gray-3);
+  transform: translateX(-50%);
+}
+
+.resizer:hover::before {
+  background: var(--gray-4);
+}
+
+.resizerDragging::before {
+  background: var(--gray-5);
+}

@@ -1,0 +1,42 @@
+@import "@radix-ui/colors/gray.css";
+
+@font-face {
+  font-family: "Inter";
+  src: url("./assets/fonts/Inter/Inter-VariableFont_opsz,wght.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("./assets/fonts/Inter/Inter-Italic-VariableFont_opsz,wght.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Libre Baskerville";
+  src: url("./assets/fonts/Libre_Baskerville/LibreBaskerville-VariableFont_wght.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Libre Baskerville";
+  src: url("./assets/fonts/Libre_Baskerville/LibreBaskerville-Italic-VariableFont_wght.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+:root {
+  --header-height: 60px;
+  --sidebar-padding-x: 16px;
+  --sidebar-padding-y: 16px;
+  --detail-padding-x: 16px;
+  --detail-padding-y: 16px;
+  font-family: "Inter", system-ui, sans-serif;
+}
