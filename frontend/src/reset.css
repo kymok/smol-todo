@@ -1,0 +1,82 @@
+@layer reset, base, components, utilities;
+
+@layer reset {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  * {
+    margin: 0;
+  }
+
+  html {
+    text-size-adjust: none;
+    -webkit-text-size-adjust: none;
+  }
+
+  body {
+    min-block-size: 100svb;
+    line-height: 1.5;
+    text-rendering: optimizeSpeed;
+  }
+
+  img,
+  picture,
+  video,
+  canvas,
+  svg {
+    display: block;
+    max-inline-size: 100%;
+  }
+
+  img,
+  picture,
+  video,
+  canvas {
+    block-size: auto;
+  }
+
+  input,
+  button,
+  textarea,
+  select {
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+  }
+
+  textarea {
+    resize: vertical;
+  }
+
+  table {
+    border-collapse: collapse;
+    border-spacing: 0;
+  }
+
+  :where(ul[role="list"], ol[role="list"]) {
+    list-style: none;
+    padding-inline-start: 0;
+  }
+
+  :where(a) {
+    color: inherit;
+    text-decoration-thickness: from-font;
+    text-underline-offset: 0.15em;
+  }
+
+  :where(p, h1, h2, h3, h4, h5, h6) {
+    overflow-wrap: break-word;
+  }
+
+  :where(:focus-visible) {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+
+  :where([hidden]) {
+    display: none !important;
+  }
+}
