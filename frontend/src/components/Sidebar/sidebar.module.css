@@ -9,7 +9,7 @@
 .inner {
   block-size: 100%;
   overflow-y: auto;
-  padding: var(--sidebar-padding-y) var(--sidebar-padding-x);
+  padding: var(--sidebar-padding-block-start) var(--sidebar-padding-inline) var(--sidebar-padding-block-end);
 }
 
 .resizer {

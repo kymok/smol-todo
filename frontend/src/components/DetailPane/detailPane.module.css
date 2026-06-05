@@ -18,7 +18,7 @@
   align-items: center;
   gap: 12px;
   block-size: var(--header-height);
-  padding-inline: var(--detail-padding-x);
+  padding-inline: var(--detail-padding-inline);
   background: canvas;
 }
 
@@ -41,8 +41,9 @@
   min-inline-size: 0;
   overflow: hidden;
   font-family: "Libre Baskerville", Georgia, serif;
-  font-size: 18px;
+  font-size: var(--detail-header-font-size);
   font-weight: 600;
+  pointer-events: none;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -53,5 +54,5 @@
 }
 
 .content {
-  padding: var(--detail-padding-y) var(--detail-padding-x);
+  padding: var(--detail-padding-block-start) var(--detail-padding-inline) var(--detail-padding-block-end);
 }

@@ -33,10 +33,23 @@
 }
 
 :root {
-  --header-height: 60px;
-  --sidebar-padding-x: 16px;
-  --sidebar-padding-y: 16px;
-  --detail-padding-x: 16px;
-  --detail-padding-y: 16px;
+  /* Layout */
+  --header-height: 80px;
+  --sidebar-padding-inline: 16px;
+  --sidebar-padding-block-start: 0;
+  --sidebar-padding-block-end: 16px;
+  --detail-padding-inline: 16px;
+  --detail-padding-block-start: 0;
+  --detail-padding-block-end: 16px;
+
+  /* Typography */
+  --sidebar-collection-font-size: 14px;
+  --sidebar-group-font-size: 12px;
+  --detail-header-font-size: 18px;
+  --detail-title-font-size: 14px;
+  --detail-note-font-size: 12px;
+  --menu-font-size: 14px;
+
+  /* font face */
   font-family: "Inter", system-ui, sans-serif;
 }
