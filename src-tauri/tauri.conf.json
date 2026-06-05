@@ -10,7 +10,7 @@
     "beforeBuildCommand": "node ../Scripts/build-sidecar.mjs release && npm run build"
   },
   "app": {
-    "windows": [{ "label": "main", "title": "", "width": 900, "height": 600, "minWidth": 480, "minHeight": 320, "titleBarStyle": "Overlay", "trafficLightPosition": { "x": 16, "y": 30 } }],
+    "windows": [{ "label": "main", "title": "", "width": 900, "height": 600, "minWidth": 480, "minHeight": 320, "titleBarStyle": "Overlay", "trafficLightPosition": { "x": 16, "y": 40 } }],
     "security": { "csp": null }
   },
   "bundle": { "active": true, "targets": "all", "icon": ["icons/icon.png"], "externalBin": ["binaries/taskpond"] }

@@ -1,0 +1,50 @@
+.row {
+  display: flex;
+  gap: 16px;
+  border-radius: 4px;
+}
+
+.focused {
+  background: #e0e0e0;
+}
+
+.status {
+  flex: 0 0 auto;
+  padding-block-start: calc(((var(--detail-title-font-size) * 1.6) - 20px) / 2);
+  cursor: pointer;
+}
+
+.statusIcon {
+  --status-icon-outline-stroke-width: 3;
+  --status-icon-filled-stroke-width: 20;
+
+  flex: 0 0 auto;
+  inline-size: 20px;
+  block-size: 20px;
+  overflow: hidden;
+}
+
+.statusIconStroke {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--status-icon-outline-stroke-width);
+  opacity: 0;
+  transition:
+    opacity 160ms ease,
+    stroke-width 220ms ease;
+}
+
+.statusIconEmpty .statusIconStroke {
+  opacity: 0;
+  stroke-width: var(--status-icon-outline-stroke-width);
+}
+
+.statusIconOutlined .statusIconStroke {
+  opacity: 1;
+  stroke-width: var(--status-icon-outline-stroke-width);
+}
+
+.statusIconFilled .statusIconStroke {
+  opacity: 1;
+  stroke-width: var(--status-icon-filled-stroke-width);
+}

@@ -1,11 +1,11 @@
 import { ContextMenu } from "@base-ui-components/react/context-menu";
-import { Circle } from "lucide-react";
-import type { CollectionColor, CollectionSummary, Snapshot, TaskItem, TaskStatus } from "../api/types";
-import { setStatus, moveItem, deleteItem } from "../api/client";
-import { leadingStatusClickTarget, rightClickStatusTarget } from "../state/status";
-import type { FocusDir } from "../state/editor";
-import { InlineEditor } from "./InlineEditor";
-import { copyText } from "../lib/clipboard";
+import type { CollectionColor, CollectionSummary, Snapshot, TaskItem, TaskStatus } from "../../api/types";
+import { setStatus, moveItem, deleteItem } from "../../api/client";
+import { leadingStatusClickTarget, rightClickStatusTarget } from "../../state/status";
+import type { FocusDir } from "../../state/editor";
+import { InlineEditor } from "../InlineEditor";
+import { copyText } from "../../lib/clipboard";
+import styles from "./TaskRow.module.css";
 
 const STATUS_COLOR: Record<TaskStatus, CollectionColor> = {
   draft: "gray", ready: "gray", "in-progress": "blue", completed: "green",
@@ -15,6 +15,14 @@ const STATUS_COLOR: Record<TaskStatus, CollectionColor> = {
 const ALL_STATUSES: TaskStatus[] = [
   "draft", "ready", "in-progress", "completed", "on-hold", "rejected", "aborted",
 ];
+
+function statusIconClass(status: TaskStatus): string {
+  if (status === "draft") return `${styles.statusIcon} ${styles.statusIconEmpty}`;
+  if (status === "ready" || status === "on-hold" || status === "rejected") {
+    return `${styles.statusIcon} ${styles.statusIconOutlined}`;
+  }
+  return `${styles.statusIcon} ${styles.statusIconFilled}`;
+}
 
 export interface TaskRowProps {
   item: TaskItem;
@@ -51,18 +59,28 @@ export function TaskRow({
     <ContextMenu.Root>
       <ContextMenu.Trigger>
         <div
+          className={focused ? `${styles.row} ${styles.focused}` : styles.row}
           onClick={onFocus}
-          style={{ background: focused ? "#e0e0e0" : undefined, borderRadius: 4 }}
         >
           <span
-            style={{ color: STATUS_COLOR[item.status], cursor: "pointer" }}
+            className={styles.status}
+            style={{ color: STATUS_COLOR[item.status] }}
             onClick={advance}
             onContextMenu={toDraft}
             title={item.status}
           >
-            <Circle size={12} fill="currentColor" />
+            <svg className={statusIconClass(item.status)} viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+              <defs>
+                <clipPath id={`status-icon-clip-${item.id}`}>
+                  <circle cx="10" cy="10" r="10" />
+                </clipPath>
+              </defs>
+              <g clipPath={`url(#status-icon-clip-${item.id})`}>
+                <circle className={styles.statusIconStroke} cx="10" cy="10" r="10" />
+              </g>
+            </svg>
           </span>
-          <div>
+          <div className={styles.text}>
             <InlineEditor
               item={item}
               field="title"
